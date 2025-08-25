@@ -48,5 +48,74 @@ def init_database(db_path=None):
                 file_data BLOB NOT NULL
             )
         ''')
+
+        # Analysis summary tables
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analysis_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pcap_id INTEGER NOT NULL,
+                analyzed_at TEXT NOT NULL,
+                duration_ms INTEGER,
+                notes TEXT,
+                UNIQUE(pcap_id),
+                FOREIGN KEY(pcap_id) REFERENCES pcaps(id) ON DELETE CASCADE
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ip_observations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pcap_id INTEGER NOT NULL,
+                ip TEXT NOT NULL,
+                count INTEGER NOT NULL,
+                UNIQUE(pcap_id, ip),
+                FOREIGN KEY(pcap_id) REFERENCES pcaps(id) ON DELETE CASCADE
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pcap_id INTEGER NOT NULL,
+                ip TEXT NOT NULL,
+                mac TEXT,
+                hostname TEXT,
+                first_seen REAL,
+                last_seen REAL,
+                UNIQUE(pcap_id, ip),
+                FOREIGN KEY(pcap_id) REFERENCES pcaps(id) ON DELETE CASCADE
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS domains (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pcap_id INTEGER NOT NULL,
+                ip TEXT,
+                domain TEXT NOT NULL,
+                source TEXT NOT NULL, -- DNS|HTTP|TLS
+                count INTEGER NOT NULL DEFAULT 1,
+                UNIQUE(pcap_id, ip, domain, source),
+                FOREIGN KEY(pcap_id) REFERENCES pcaps(id) ON DELETE CASCADE
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS flows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pcap_id INTEGER NOT NULL,
+                src_ip TEXT NOT NULL,
+                src_port INTEGER,
+                dst_ip TEXT NOT NULL,
+                dst_port INTEGER,
+                protocol TEXT,
+                packet_count INTEGER NOT NULL,
+                byte_count INTEGER NOT NULL,
+                first_seen REAL,
+                last_seen REAL,
+                UNIQUE(pcap_id, src_ip, src_port, dst_ip, dst_port, protocol),
+                FOREIGN KEY(pcap_id) REFERENCES pcaps(id) ON DELETE CASCADE
+            )
+        ''')
         
         conn.commit()
