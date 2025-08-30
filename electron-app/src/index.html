@@ -3,53 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetSleuth PCAP Analyzer</title>
-    <link rel="stylesheet" href="assets/styles.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' http://localhost:5000;">
+    <title>PCAP Network Analyzer</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <!-- Header -->
-    <header class="app-header">
-        <div class="header-content">
-            <div class="logo-section">
-                <i class="fas fa-network-wired"></i>
-                <h1>NetSleuth</h1>
-                <span class="subtitle">PCAP Analyzer</span>
-            </div>
-            <div class="header-stats">
-                <div class="stat-item">
-                    <span class="stat-label">Total Files</span>
-                    <span class="stat-value" id="totalFiles">0</span>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="app-title">
+                    <i class="fas fa-network-wired"></i>
+                    <h1>PCAP Network Analyzer</h1>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-label">Total Size</span>
-                    <span class="stat-value" id="totalSize">0 MB</span>
+                <div class="header-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Files:</span>
+                        <span class="stat-value" id="totalFiles">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Size:</span>
+                        <span class="stat-value" id="totalSize">0 B</span>
+                    </div>
                 </div>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Main Content -->
-    <main class="main-content">
-        <!-- Upload Section -->
-        <section class="upload-section">
-            <div class="upload-card">
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">
-                        <i class="fas fa-cloud-upload-alt"></i>
+        <!-- Navigation -->
+        <nav class="app-nav">
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="files">
+                    <i class="fas fa-folder"></i>
+                    Files
+                </button>
+                <button class="nav-tab" data-tab="analysis">
+                    <i class="fas fa-chart-line"></i>
+                    Analysis
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Files Tab -->
+            <section id="files" class="tab-content active">
+                <div class="content-header">
+                    <h2>PCAP Files</h2>
+                    <div class="content-actions">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchInput" placeholder="Search files...">
+                        </div>
+                        <select id="sortSelect" onchange="sortFiles()">
+                            <option value="date-desc">Newest First</option>
+                            <option value="date-asc">Oldest First</option>
+                            <option value="name-asc">Name A-Z</option>
+                            <option value="name-desc">Name Z-A</option>
+                            <option value="size-desc">Largest First</option>
+                            <option value="size-asc">Smallest First</option>
+                        </select>
+                        <button class="btn btn-danger" onclick="confirmDeleteAll()">
+                            <i class="fas fa-trash-alt"></i>
+                            Delete All
+                        </button>
                     </div>
-                    <h3>Upload PCAP Files</h3>
-                    <p>Drag and drop your PCAP files here, or click to browse</p>
-                    <div class="supported-formats">
-                        <small>Supported formats: .pcap, .pcapng, .cap, .dmp, .dump, .eth, .snoop</small>
-                    </div>
-                    <input type="file" id="fileInput" multiple accept=".pcap,.pcapng,.cap,.dmp,.dump,.eth,.fdc,.pcap1,.pcapx,.snoop,.cap1,.cap2,.trc,.trace,.out">
-                    <button class="browse-btn" onclick="document.getElementById('fileInput').click()">
-                        <i class="fas fa-folder-open"></i>
-                        Browse Files
-                    </button>
                 </div>
-                
+
+                <!-- Upload Area -->
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>Drop PCAP files here</h3>
+                        <p>or <button class="upload-btn" onclick="document.getElementById('fileInput').click()">choose files</button></p>
+                        <input type="file" id="fileInput" multiple accept=".pcap,.pcapng,.cap" hidden>
+                        <small>Supported formats: .pcap, .pcapng, .cap</small>
+                    </div>
+                </div>
+
                 <!-- Upload Progress -->
                 <div class="upload-progress" id="uploadProgress" style="display: none;">
                     <div class="progress-bar">
@@ -57,93 +92,237 @@
                     </div>
                     <div class="progress-text" id="progressText">Uploading...</div>
                 </div>
-            </div>
-        </section>
 
-        <!-- Files Section -->
-        <section class="files-section">
-            <div class="section-header">
-                <h2><i class="fas fa-files-o"></i> Uploaded PCAP Files</h2>
-                <div class="section-actions">
-                    <button class="refresh-btn" onclick="loadFiles()" title="Refresh">
-                        <i class="fas fa-refresh"></i>
-                    </button>
-                    <button class="delete-all-btn" onclick="confirmDeleteAll()" title="Delete All">
-                        <i class="fas fa-trash"></i>
-                        Clear All
-                    </button>
+                <!-- Files Grid -->
+                <div class="files-container">
+                    <div class="files-grid" id="filesGrid">
+                        <!-- File cards will be populated here -->
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div class="empty-state" id="emptyState">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>No PCAP files uploaded</h3>
+                        <p>Upload your first PCAP file to start analyzing network traffic</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-upload"></i>
+                            Upload Files
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analysis Tab -->
+            <section id="analysis" class="tab-content">
+                <div class="content-header">
+                    <h2>Network Analysis</h2>
+                    <div class="analysis-controls">
+                        <select id="analysisFileSelect" class="file-select">
+                            <option value="" disabled selected>Select a PCAP file...</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="triggerAnalysis()">
+                            <i class="fas fa-play"></i>
+                            Analyze
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Analysis Summary -->
+                <div class="analysis-summary">
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="card-icon">
+                                <i class="fas fa-globe"></i>
+                            </div>
+                            <div class="card-content">
+                                <div class="card-title">IP Addresses</div>
+                                <div class="card-value" id="sumIPs">0</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="card-icon">
+                                <i class="fas fa-desktop"></i>
+                            </div>
+                            <div class="card-content">
+                                <div class="card-title">Devices</div>
+                                <div class="card-value" id="sumDevices">0</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="card-icon">
+                                <i class="fas fa-server"></i>
+                            </div>
+                            <div class="card-content">
+                                <div class="card-title">Domains</div>
+                                <div class="card-value" id="sumDomains">0</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="card-icon">
+                                <i class="fas fa-exchange-alt"></i>
+                            </div>
+                            <div class="card-content">
+                                <div class="card-title">Network Flows</div>
+                                <div class="card-value" id="sumFlows">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="analysis-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Last Analyzed:</span>
+                            <span class="meta-value" id="sumAnalyzedAt">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Results -->
+                <div class="analysis-results">
+                    <div class="results-grid">
+                        <!-- IP Addresses -->
+                        <div class="result-panel">
+                            <h3><i class="fas fa-globe"></i> IP Addresses</h3>
+                            <div class="table-container">
+                                <table class="data-table" id="ipsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>IP Address</th>
+                                            <th>Packet Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Data populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Network Devices -->
+                        <div class="result-panel">
+                            <h3><i class="fas fa-desktop"></i> Network Devices</h3>
+                            <div class="table-container">
+                                <table class="data-table" id="devicesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>IP Address</th>
+                                            <th>MAC Address</th>
+                                            <th>Hostname</th>
+                                            <th>First Seen</th>
+                                            <th>Last Seen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Data populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Domains -->
+                        <div class="result-panel">
+                            <h3><i class="fas fa-server"></i> Domains & Services</h3>
+                            <div class="table-container">
+                                <table class="data-table" id="domainsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>IP Address</th>
+                                            <th>Domain/Service</th>
+                                            <th>Source</th>
+                                            <th>Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Data populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Network Flows -->
+                        <div class="result-panel">
+                            <h3><i class="fas fa-exchange-alt"></i> Network Flows</h3>
+                            <div class="table-container">
+                                <table class="data-table" id="flowsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Source IP</th>
+                                            <th>Source Port</th>
+                                            <th>Destination IP</th>
+                                            <th>Dest Port</th>
+                                            <th>Protocol</th>
+                                            <th>Packets</th>
+                                            <th>Bytes</th>
+                                            <th>First Seen</th>
+                                            <th>Last Seen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Data populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- User Activity -->
+                        <div class="result-panel">
+                            <h3><i class="fas fa-user"></i> User Activity</h3>
+                            <div class="table-container">
+                                <table class="data-table" id="userActivityTable">
+                                    <thead>
+                                        <tr>
+                                            <th>User/Host (IP)</th>
+                                            <th>MAC Address</th>
+                                            <th>Hostname</th>
+                                            <th>Accessed Domains / Websites</th>
+                                            <th>Time Range</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Data populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <small style="color: var(--text-muted); display:block; margin-top: 6px;">This section links network events to specific hosts.</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Status Messages Container -->
+        <div class="status-container" id="statusContainer">
+            <!-- Status messages will appear here -->
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading...</p>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div class="modal-overlay" id="deleteModal" style="display: none;">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Confirm Deletion</h3>
+                </div>
+                <div class="modal-body">
+                    <p id="deleteMessage">Are you sure you want to delete this file?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                    <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
                 </div>
             </div>
-
-            <!-- Search and Filter -->
-            <div class="controls-bar">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search files..." onkeyup="filterFiles()">
-                </div>
-                <div class="sort-controls">
-                    <label>Sort by:</label>
-                    <select id="sortSelect" onchange="sortFiles()">
-                        <option value="date-desc">Date (Newest)</option>
-                        <option value="date-asc">Date (Oldest)</option>
-                        <option value="name-asc">Name (A-Z)</option>
-                        <option value="name-desc">Name (Z-A)</option>
-                        <option value="size-desc">Size (Largest)</option>
-                        <option value="size-asc">Size (Smallest)</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Files Grid -->
-            <div class="files-grid" id="filesGrid">
-                <!-- Files will be populated here -->
-            </div>
-
-            <!-- Empty State -->
-            <div class="empty-state" id="emptyState">
-                <div class="empty-icon">
-                    <i class="fas fa-folder-open"></i>
-                </div>
-                <h3>No PCAP files uploaded yet</h3>
-                <p>Upload your first PCAP file to get started with network analysis</p>
-                <button class="upload-first-btn" onclick="document.getElementById('fileInput').click()">
-                    <i class="fas fa-plus"></i>
-                    Upload Your First File
-                </button>
-            </div>
-        </section>
-    </main>
-
-    <!-- Status Messages -->
-    <div class="status-container" id="statusContainer">
-        <!-- Status messages will appear here -->
-    </div>
-
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Loading...</p>
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div class="modal-overlay" id="deleteModal" style="display: none;">
-        <div class="modal">
-            <div class="modal-header">
-                <h3><i class="fas fa-exclamation-triangle"></i> Confirm Delete</h3>
-                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p id="deleteMessage">Are you sure you want to delete this file?</p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-                <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="renderer.js"></script>
+    <!-- JavaScript -->
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/files.js"></script>
+    <script src="js/analysis.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

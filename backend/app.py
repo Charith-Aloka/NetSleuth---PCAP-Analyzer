@@ -6,6 +6,7 @@ Simple upload and delete functionality
 from flask import Flask, jsonify
 from flask_cors import CORS
 from routes.ingest import ingest_bp
+from routes.analyze import analyze_bp
 from utils.db import init_database
 import os
 
@@ -22,6 +23,7 @@ init_database(DB_PATH)
 
 # Register routes
 app.register_blueprint(ingest_bp, url_prefix='/api')
+app.register_blueprint(analyze_bp, url_prefix='/api')
 
 @app.route('/')
 def index():
@@ -35,6 +37,11 @@ def index():
 @app.route('/health')
 def health():
     """Health check for monitoring"""
+    return jsonify({'status': 'healthy'})
+
+@app.route('/api/health')
+def api_health():
+    """API-prefixed health check to satisfy frontend checks"""
     return jsonify({'status': 'healthy'})
 
 @app.errorhandler(404)
