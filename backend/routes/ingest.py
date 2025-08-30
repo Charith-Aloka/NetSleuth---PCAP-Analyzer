@@ -28,70 +28,52 @@ def allowed_file(filename):
 
 @ingest_bp.route('/upload', methods=['POST'])
 def upload_file():
-    """Upload and store PCAP file"""
+    """Upload and store PCAP file. Accepts 'file' or 'files' (multiple)."""
     try:
-        if 'file' not in request.files:
+        # Accept either 'file' or 'files'
+        files_list = []
+        if 'files' in request.files:
+            files_list = request.files.getlist('files')
+        elif 'file' in request.files:
+            files_list = [request.files['file']]
+        else:
             return jsonify({'error': 'No file selected'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-        
-        if not allowed_file(file.filename):
-            return jsonify({
-                'error': 'Invalid file type', 
-                'message': 'Please select a PCAP file (.pcap, .pcapng, .cap, etc.)'
-            }), 400
-        
-        # Read file data
-        file_data = file.read()
-        if len(file_data) == 0:
-            return jsonify({'error': 'Empty file'}), 400
-        
-        # Generate file metadata
-        original_filename = file.filename
-        safe_filename = secure_filename(original_filename)
-        file_size = len(file_data)
-        sha256_hash = hashlib.sha256(file_data).hexdigest()
-        mime_type = file.mimetype or 'application/octet-stream'
-        uploaded_at = datetime.utcnow().isoformat()
-        
-        # Store in database
+
+        saved = []
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
-            # Check if file already exists (by hash)
-            cursor.execute('SELECT id, filename FROM pcaps WHERE sha256 = ?', (sha256_hash,))
-            existing = cursor.fetchone()
-            
-            if existing:
-                return jsonify({
-                    'error': 'File already exists',
-                    'message': f'This file already exists as "{existing[1]}"',
-                    'existing_id': existing[0]
-                }), 409
-            
-            # Insert new file
-            cursor.execute('''
-                INSERT INTO pcaps (filename, original_filename, size, sha256, mime_type, uploaded_at, file_data)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (safe_filename, original_filename, file_size, sha256_hash, mime_type, uploaded_at, file_data))
-            
-            file_id = cursor.lastrowid
+            for file in files_list:
+                if file.filename == '':
+                    continue
+                if not allowed_file(file.filename):
+                    continue
+                data = file.read()
+                if not data:
+                    continue
+                original_filename = file.filename
+                safe_filename = secure_filename(original_filename)
+                size = len(data)
+                sha256_hash = hashlib.sha256(data).hexdigest()
+                mime_type = file.mimetype or 'application/octet-stream'
+                uploaded_at = datetime.utcnow().isoformat()
+                # skip duplicates by hash
+                cursor.execute('SELECT id, filename FROM pcaps WHERE sha256 = ?', (sha256_hash,))
+                existing = cursor.fetchone()
+                if existing:
+                    saved.append({'id': existing[0], 'filename': existing[1], 'original_filename': original_filename, 'size': size, 'sha256': sha256_hash, 'uploaded_at': uploaded_at, 'duplicate': True})
+                    continue
+                cursor.execute('''
+                    INSERT INTO pcaps (filename, original_filename, size, sha256, mime_type, uploaded_at, file_data)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (safe_filename, original_filename, size, sha256_hash, mime_type, uploaded_at, data))
+                file_id = cursor.lastrowid
+                saved.append({'id': file_id, 'filename': safe_filename, 'original_filename': original_filename, 'size': size, 'sha256': sha256_hash, 'uploaded_at': uploaded_at})
             conn.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': 'File uploaded successfully!',
-            'file': {
-                'id': file_id,
-                'filename': safe_filename,
-                'original_filename': original_filename,
-                'size': file_size,
-                'sha256': sha256_hash,
-                'uploaded_at': uploaded_at
-            }
-        }), 201
+
+        if not saved:
+            return jsonify({'error': 'No valid files to upload'}), 400
+
+        return jsonify({'success': True, 'message': 'Upload completed', 'files': saved}), 201
         
     except Exception as e:
         print(f"Upload error: {str(e)}")
@@ -142,6 +124,19 @@ def list_files():
     except Exception as e:
         print(f"List files error: {str(e)}")
         return jsonify({'error': f'Failed to list files: {str(e)}'}), 500
+
+@ingest_bp.route('/files', methods=['DELETE'])
+def delete_all_files():
+    """Delete all PCAP files"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM pcaps')
+            conn.commit()
+        return jsonify({'success': True, 'message': 'All files deleted'})
+    except Exception as e:
+        print(f"Delete all files error: {str(e)}")
+        return jsonify({'error': f'Delete all failed: {str(e)}'}), 500
 
 @ingest_bp.route('/download/<int:file_id>', methods=['GET'])
 def download_file(file_id):

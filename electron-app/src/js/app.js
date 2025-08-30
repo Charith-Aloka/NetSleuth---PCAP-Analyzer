@@ -60,8 +60,8 @@ class PCAPAnalyzer {
         try {
             console.log('Checking backend health...');
             
-            // Try to reach the backend with a simple request
-            await window.api.get('/files');
+            // Try to reach the backend with a lightweight health endpoint
+            await window.api.get('/health');
             
             this.apiHealthy = true;
             console.log('Backend is healthy and responding');

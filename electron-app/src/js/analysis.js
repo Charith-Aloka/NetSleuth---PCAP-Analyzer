@@ -103,11 +103,12 @@ class AnalysisManager {
     async loadAnalysisData(fileId) {
         try {
             // Load all analysis data in parallel
-            const [ips, devices, domains, flows] = await Promise.all([
+            const [ips, devices, domains, flows, userActivity] = await Promise.all([
                 window.api.get(`/analysis/${fileId}/ips`),
                 window.api.get(`/analysis/${fileId}/devices`),
                 window.api.get(`/analysis/${fileId}/domains`),
-                window.api.get(`/analysis/${fileId}/flows`)
+                window.api.get(`/analysis/${fileId}/flows`),
+                window.api.get(`/analysis/${fileId}/user_activity`)
             ]);
 
             // Render tables
@@ -115,6 +116,7 @@ class AnalysisManager {
             this.renderDevicesTable(devices.items || []);
             this.renderDomainsTable(domains.items || []);
             this.renderFlowsTable(flows.items || []);
+            this.renderUserActivityTable(userActivity.items || []);
 
         } catch (error) {
             console.error('Error loading analysis data:', error);
@@ -230,6 +232,33 @@ class AnalysisManager {
                 tbody.innerHTML = '<tr><td colspan="100%" style="text-align: center; color: var(--text-muted);">No data available</td></tr>';
             }
         });
+    }
+
+    // Render user activity table
+    renderUserActivityTable(items) {
+        const tbody = document.querySelector('#userActivityTable tbody');
+        if (!tbody) return;
+
+        if (!items || items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No user activity available</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = items.map(it => {
+            const domains = (it.domains || []).join(', ');
+            const start = this.formatTimestamp(it.time_start);
+            const end = this.formatTimestamp(it.time_end);
+            const range = start !== '-' && end !== '-' ? `${start} – ${end}` : '-';
+            return `
+                <tr>
+                    <td><strong>${this.escapeHtml(it.ip)}</strong></td>
+                    <td>${it.mac || '-'}</td>
+                    <td>${this.escapeHtml(it.hostname || '-')}</td>
+                    <td>${this.escapeHtml(domains)}</td>
+                    <td>${range}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
     // Utility functions

@@ -6,7 +6,7 @@ A desktop app for uploading, storing, and downloading .pcap/.pcapng files using 
 
 NetSleuth/
 │
-├── electron-app/              # UI Layer (Electron frontend)
+├── frontend/              # UI Layer (Electron frontend)
 │   ├── src/
 │   │   ├── components/        # UI components like upload forms, report viewer
 │   │   └── assets/            # Static assets (icons, images, CSS, logos)

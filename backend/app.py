@@ -39,6 +39,11 @@ def health():
     """Health check for monitoring"""
     return jsonify({'status': 'healthy'})
 
+@app.route('/api/health')
+def api_health():
+    """API-prefixed health check to satisfy frontend checks"""
+    return jsonify({'status': 'healthy'})
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Endpoint not found'}), 404

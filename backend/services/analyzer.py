@@ -76,136 +76,136 @@ def analyze_bytes_and_store(db: sqlite3.Connection, pcap_id: int, file_bytes: by
 		with Reader(tmp_path) as rd:
 			for pkt in rd:
 				try:
-				ts = float(getattr(pkt, 'time', 0.0))
+					ts = float(getattr(pkt, 'time', 0.0))
 
-				src_ip = dst_ip = None
-				if IP in pkt:
-					src_ip = pkt[IP].src
-					dst_ip = pkt[IP].dst
-				elif IPv6 in pkt:
-					src_ip = pkt[IPv6].src
-					dst_ip = pkt[IPv6].dst
+					src_ip = dst_ip = None
+					if IP in pkt:
+						src_ip = pkt[IP].src
+						dst_ip = pkt[IP].dst
+					elif IPv6 in pkt:
+						src_ip = pkt[IPv6].src
+						dst_ip = pkt[IPv6].dst
 
-				# Update IP counters and device times
-				for ip in (src_ip, dst_ip):
-					if ip:
-						ip_counts[ip] += 1
-						first_seen.setdefault(ip, ts)
-						last_seen[ip] = ts
+					# Update IP counters and device times
+					for ip in (src_ip, dst_ip):
+						if ip:
+							ip_counts[ip] += 1
+							first_seen.setdefault(ip, ts)
+							last_seen[ip] = ts
 
-				# MAC addresses if available
-				if Ether in pkt and src_ip:
-					mac = getattr(pkt[Ether], 'src', None)
-					if mac:
-						dev = devices.setdefault(src_ip, {
-							'ip': src_ip,
-							'mac': None,
-							'hostname': None,
-							'first': ts,
-							'last': ts,
-						})
-						dev['mac'] = dev['mac'] or mac
-						dev['first'] = min(dev['first'], ts)
-						dev['last'] = max(dev['last'], ts)
+					# MAC addresses if available
+					if Ether in pkt and src_ip:
+						mac = getattr(pkt[Ether], 'src', None)
+						if mac:
+							dev = devices.setdefault(src_ip, {
+								'ip': src_ip,
+								'mac': None,
+								'hostname': None,
+								'first': ts,
+								'last': ts,
+							})
+							dev['mac'] = dev['mac'] or mac
+							dev['first'] = min(dev['first'], ts)
+							dev['last'] = max(dev['last'], ts)
 
-				# DNS queries (qr=0) -> domains by src_ip
-				if DNS in pkt and getattr(pkt[DNS], 'qd', None) is not None and getattr(pkt[DNS], 'qr', 0) == 0:
-					try:
-						qname = pkt[DNS].qd.qname
-						if isinstance(qname, bytes):
-							qname = qname.decode(errors='ignore')
-						qname = qname.strip('.')
-						if qname:
-							key = (src_ip, qname, 'DNS')
-							domains[key] += 1
-							# Heuristic hostname from mDNS (.local)
-							if qname.endswith('.local') and src_ip:
-								dev = devices.setdefault(src_ip, {
-									'ip': src_ip,
-									'mac': None,
-									'hostname': None,
-									'first': ts,
-									'last': ts,
-								})
-								dn = qname.split('.')[0]
-								if dn:
-									dev['hostname'] = dev.get('hostname') or dn
-					except Exception:
-						pass
-
-				# HTTP Host header (if HTTPRequest layer available)
-				if HTTPRequest is not None and HTTPRequest in pkt:
-					try:
-						host = getattr(pkt[HTTPRequest], 'Host', b'')
-						if isinstance(host, bytes):
-							host = host.decode(errors='ignore')
-						host = host.strip()
-						if host:
-							key = (src_ip, host, 'HTTP')
-							domains[key] += 1
-					except Exception:
-						pass
-
-				# TLS SNI if available (best-effort)
-				if TLSClientHello is not None and (TCP in pkt):
-					try:
-						# Scapy TLS parsing is heavy; best-effort pattern
-						# Extract raw TCP payload and try to parse for SNI extension
-						raw = bytes(pkt[TCP].payload) if pkt[TCP].payload else b''
-						if raw:
-							# Minimal heuristic: look for "\x00\x00" length then "\x00\x00"? Complex; fallback: skip unless TLS layer present
-							# For reliability, skip custom parsing if TLS layers are not dissected
+					# DNS queries (qr=0) -> domains by src_ip
+					if DNS in pkt and getattr(pkt[DNS], 'qd', None) is not None and getattr(pkt[DNS], 'qr', 0) == 0:
+						try:
+							qname = pkt[DNS].qd.qname
+							if isinstance(qname, bytes):
+								qname = qname.decode(errors='ignore')
+							qname = qname.strip('.')
+							if qname:
+								key = (src_ip, qname, 'DNS')
+								domains[key] += 1
+								# Heuristic hostname from mDNS (.local)
+								if qname.endswith('.local') and src_ip:
+									dev = devices.setdefault(src_ip, {
+										'ip': src_ip,
+										'mac': None,
+										'hostname': None,
+										'first': ts,
+										'last': ts,
+									})
+									dn = qname.split('.')[0]
+									if dn:
+										dev['hostname'] = dev.get('hostname') or dn
+						except Exception:
 							pass
-					except Exception:
-						pass
 
-				# DHCP hostnames
-				if DHCP is not None and DHCP in pkt and src_ip:
-					try:
-						opts = getattr(pkt[DHCP], 'options', [])
-						for k, v in opts:
-							if k == 'hostname' and v:
-								if isinstance(v, bytes):
-									v = v.decode(errors='ignore')
-								dev = devices.setdefault(src_ip, {
-									'ip': src_ip,
-									'mac': None,
-									'hostname': None,
-									'first': ts,
-									'last': ts,
-								})
-								if v:
-									dev['hostname'] = dev.get('hostname') or v
-								break
-					except Exception:
-						pass
+					# HTTP Host header (if HTTPRequest layer available)
+					if HTTPRequest is not None and HTTPRequest in pkt:
+						try:
+							host = getattr(pkt[HTTPRequest], 'Host', b'')
+							if isinstance(host, bytes):
+								host = host.decode(errors='ignore')
+							host = host.strip()
+							if host:
+								key = (src_ip, host, 'HTTP')
+								domains[key] += 1
+						except Exception:
+							pass
 
-				# Flows
-				proto = None
-				sport = dport = None
-				if TCP in pkt:
-					proto = 'TCP'
-					sport = int(getattr(pkt[TCP], 'sport', 0) or 0)
-					dport = int(getattr(pkt[TCP], 'dport', 0) or 0)
-				elif UDP in pkt:
-					proto = 'UDP'
-					sport = int(getattr(pkt[UDP], 'sport', 0) or 0)
-					dport = int(getattr(pkt[UDP], 'dport', 0) or 0)
+					# TLS SNI if available (best-effort)
+					if TLSClientHello is not None and (TCP in pkt):
+						try:
+							# Scapy TLS parsing is heavy; best-effort pattern
+							# Extract raw TCP payload and try to parse for SNI extension
+							raw = bytes(pkt[TCP].payload) if pkt[TCP].payload else b''
+							if raw:
+								# Minimal heuristic: look for "\x00\x00" length then "\x00\x00"? Complex; fallback: skip unless TLS layer present
+								# For reliability, skip custom parsing if TLS layers are not dissected
+								pass
+						except Exception:
+							pass
 
-				if src_ip and dst_ip and proto:
-					key = FlowKey(src_ip, sport, dst_ip, dport, proto)
-					flows_pkts[key] += 1
-					# Prefer wirelen if present else len
-					try:
-						pkt_len = int(getattr(pkt, 'wirelen', None) or len(bytes(pkt)))
-					except Exception:
-						pkt_len = 0
-					flows_bytes[key] += pkt_len
-					flow_first.setdefault(key, ts)
-					flow_last[key] = ts
+					# DHCP hostnames
+					if DHCP is not None and DHCP in pkt and src_ip:
+						try:
+							opts = getattr(pkt[DHCP], 'options', [])
+							for k, v in opts:
+								if k == 'hostname' and v:
+									if isinstance(v, bytes):
+										v = v.decode(errors='ignore')
+									dev = devices.setdefault(src_ip, {
+										'ip': src_ip,
+										'mac': None,
+										'hostname': None,
+										'first': ts,
+										'last': ts,
+									})
+									if v:
+										dev['hostname'] = dev.get('hostname') or v
+									break
+						except Exception:
+							pass
 
-			except Exception:
-				continue
+					# Flows
+					proto = None
+					sport = dport = None
+					if TCP in pkt:
+						proto = 'TCP'
+						sport = int(getattr(pkt[TCP], 'sport', 0) or 0)
+						dport = int(getattr(pkt[TCP], 'dport', 0) or 0)
+					elif UDP in pkt:
+						proto = 'UDP'
+						sport = int(getattr(pkt[UDP], 'sport', 0) or 0)
+						dport = int(getattr(pkt[UDP], 'dport', 0) or 0)
+
+					if src_ip and dst_ip and proto:
+						key = FlowKey(src_ip, sport, dst_ip, dport, proto)
+						flows_pkts[key] += 1
+						# Prefer wirelen if present else len
+						try:
+							pkt_len = int(getattr(pkt, 'wirelen', None) or len(bytes(pkt)))
+						except Exception:
+							pkt_len = 0
+						flows_bytes[key] += pkt_len
+						flow_first.setdefault(key, ts)
+						flow_last[key] = ts
+
+				except Exception:
+					pass
 
 	finally:
 		if tmp_path and os.path.exists(tmp_path):
