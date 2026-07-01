@@ -611,6 +611,13 @@ select:focus {
     border-bottom: none;
 }
 
+/* Threat verdict badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid rgba(0,0,0,0.1)}
+.badge-danger{background:#fee2e2;color:#7f1d1d;border-color:#fecaca}
+.badge-warn{background:#fef3c7;color:#78350f;border-color:#fde68a}
+.badge-ok{background:#dcfce7;color:#14532d;border-color:#bbf7d0}
+.badge-unknown{background:#e5e7eb;color:#374151;border-color:#e5e7eb}
+
 /* Status Messages */
 .status-container {
     position: fixed;
@@ -818,3 +825,6 @@ select:focus {
         flex: none;
     }
 }
+
+/* Import Enhanced Analysis Styles */
+@import url('./analysis-enhanced.css');
