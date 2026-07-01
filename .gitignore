@@ -136,3 +136,4 @@ dist/
 # System files
 *.tmp
 *.temp
+backend/config/gemini_config.py

@@ -45,13 +45,14 @@ class PCAPAnalyzer {
 
     async initializeComponents() {
         // Initialize UI Manager
-        window.ui.init();
+        if (window.ui) {
+            window.ui.init();
+        }
         
         // Initialize File Manager
-        window.fileManager.init();
-        
-        // Initialize Analysis Manager
-        window.analysisManager.init();
+        if (window.fileManager) {
+            window.fileManager.init();
+        }
         
         console.log('All components initialized');
     }

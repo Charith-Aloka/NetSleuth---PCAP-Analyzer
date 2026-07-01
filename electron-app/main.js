@@ -45,7 +45,7 @@ function stopBackendServer() {
 }
 
 function createWindow() {
-    // Create the browser window
+    // Create the browser window with memory optimizations
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
@@ -55,7 +55,19 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             enableRemoteModule: false,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'preload.js'),
+            // Memory optimization settings
+            webSecurity: true,
+            allowRunningInsecureContent: false,
+            experimentalFeatures: false,
+            backgroundThrottling: true,
+            // Enable V8 memory optimization
+            additionalArguments: [
+                '--max-old-space-size=512',           // Limit V8 heap to 512MB
+                '--optimize-for-size',                 // Optimize for memory usage
+                '--memory-reducer',                    // Enable memory reducer
+                '--gc-interval=100'                    // More frequent garbage collection
+            ]
         },
         icon: path.join(__dirname, 'src', 'assets', 'icon.png'),
         show: false,
@@ -73,11 +85,56 @@ function createWindow() {
         if (process.platform === 'win32' || process.platform === 'linux') {
             mainWindow.focus();
         }
+        
+        // Log initial memory usage
+        setTimeout(() => {
+            const memoryUsage = process.memoryUsage();
+            console.log('🔍 Initial memory usage:', {
+                'RSS': `${(memoryUsage.rss / 1024 / 1024).toFixed(1)}MB`,
+                'Heap Used': `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(1)}MB`,
+                'Heap Total': `${(memoryUsage.heapTotal / 1024 / 1024).toFixed(1)}MB`,
+                'External': `${(memoryUsage.external / 1024 / 1024).toFixed(1)}MB`
+            });
+        }, 2000);
     });
-    
+
+    // Handle window closing
+    mainWindow.on('close', (event) => {
+        // Execute cleanup before closing
+        mainWindow.webContents.executeJavaScript(`
+            // Stop memory monitoring
+            if (window.memoryMonitor) {
+                window.memoryMonitor.stop();
+            }
+            
+            // Clear large data structures
+            if (window.fileManager) {
+                window.fileManager.filesData = [];
+                window.fileManager.filteredFiles = [];
+            }
+            
+            if (window.analysisManager) {
+                window.analysisManager.analysisData = null;
+            }
+            
+            // Force garbage collection if available
+            if (window.gc) {
+                window.gc();
+            }
+            
+            console.log('🧹 Memory cleanup completed before window close');
+        `).catch(err => console.log('Cleanup error:', err));
+    });
+
     // Handle window closed
     mainWindow.on('closed', () => {
         mainWindow = null;
+        
+        // Force garbage collection on main process
+        if (global.gc) {
+            global.gc();
+            console.log('🧹 Main process garbage collection completed');
+        }
     });
     
     // Handle external links

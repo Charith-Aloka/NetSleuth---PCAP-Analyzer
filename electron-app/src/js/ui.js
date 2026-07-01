@@ -36,9 +36,6 @@ class UIManager {
             searchInput: '#searchInput',
             sortSelect: '#sortSelect',
             
-            // Analysis section
-            analysisFileSelect: '#analysisFileSelect',
-            
             // Progress and loading
             uploadProgress: '#uploadProgress',
             progressFill: '#progressFill',
@@ -48,13 +45,6 @@ class UIManager {
             // Statistics
             totalFiles: '#totalFiles',
             totalSize: '#totalSize',
-            
-            // Analysis summary
-            sumIPs: '#sumIPs',
-            sumDevices: '#sumDevices',
-            sumDomains: '#sumDomains',
-            sumFlows: '#sumFlows',
-            sumAnalyzedAt: '#sumAnalyzedAt',
             
             // Modals
             deleteModal: '#deleteModal',
@@ -104,14 +94,6 @@ class UIManager {
         if (sortSelect) {
             sortSelect.addEventListener('change', () => {
                 window.fileManager.sortFiles();
-            });
-        }
-
-        // Analysis file select
-        const analysisFileSelect = this.get('analysisFileSelect');
-        if (analysisFileSelect) {
-            analysisFileSelect.addEventListener('change', () => {
-                window.analysisManager.refreshAnalysis();
             });
         }
 

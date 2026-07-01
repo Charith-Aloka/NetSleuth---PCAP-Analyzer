@@ -112,6 +112,15 @@ class APIClient {
     async download(endpoint) {
         return this.request(endpoint, { method: 'GET' });
     }
+
+    // Threat assessment
+    async assessDomains(fileId) {
+        return this.post(`/analysis/${fileId}/assess_domains`);
+    }
+
+    async getAssessments(fileId) {
+        return this.get(`/analysis/${fileId}/assessments`);
+    }
 }
 
 // Create global API instance

@@ -19,18 +19,30 @@ class FileManager {
             console.log('Loading files from backend...');
             window.ui.showLoading();
             
+            // Clear existing data before loading new data to prevent memory accumulation
+            this.filesData = [];
+            this.filteredFiles = [];
+            
             const data = await window.api.get('/files');
             this.filesData = data.files || [];
-            this.filteredFiles = [...this.filesData];
+            
+            // Use slice instead of spread operator for better performance with large arrays
+            this.filteredFiles = this.filesData.slice();
             
             console.log(`Loaded ${this.filesData.length} files`);
             
-            this.renderFiles();
-            this.updateAnalysisDropdown();
-            this.updateStatistics();
+            // Use requestAnimationFrame to prevent UI blocking
+            requestAnimationFrame(() => {
+                this.renderFiles();
+                this.updateStatistics();
+            });
             
         } catch (error) {
             console.error('Error loading files:', error);
+            // Ensure data is cleared even on error
+            this.filesData = [];
+            this.filteredFiles = [];
+            this.renderFiles();
             window.ui.showStatus(`Error loading files: ${error.message}`, 'error');
         } finally {
             window.ui.hideLoading();
@@ -100,52 +112,100 @@ class FileManager {
         filesGrid.style.display = 'grid';
         emptyState.style.display = 'none';
         
-        filesGrid.innerHTML = this.filteredFiles.map(file => `
-            <div class="file-card" data-file-id="${file.id}">
+        // Clear existing content to prevent memory leaks
+        filesGrid.innerHTML = '';
+        
+        // Use DocumentFragment for efficient DOM manipulation
+        const fragment = document.createDocumentFragment();
+        
+        this.filteredFiles.forEach(file => {
+            const card = document.createElement('div');
+            card.className = 'file-card';
+            card.dataset.fileId = file.id;
+            
+            // Escape HTML to prevent XSS
+            const escapedName = this.escapeHtml(file.original_filename);
+            const escapedNameForJs = file.original_filename.replace(/'/g, "\\'").replace(/"/g, '\\"');
+            
+            card.innerHTML = `
                 <div class="file-icon">
                     <i class="fas fa-file-alt"></i>
                 </div>
                 <div class="file-info">
-                    <div class="file-name" title="${file.original_filename}">
-                        ${window.ui.truncateFilename(file.original_filename, 30)}
+                    <div class="file-name" title="${escapedName}">
+                        ${window.ui.truncateFilename(escapedName, 30)}
                     </div>
                     <div class="file-meta">
                         ${file.size_formatted} • ${window.ui.formatDate(file.uploaded_at)}
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="btn" onclick="fileManager.downloadFile(${file.id}, '${file.original_filename.replace(/'/g, "\\'")}')">
+                    <button class="btn" data-action="download" data-file-id="${file.id}" data-filename="${escapedNameForJs}">
                         <i class="fas fa-download"></i>
                         Download
                     </button>
-                    <button class="btn btn-primary" onclick="fileManager.selectAndAnalyze(${file.id})">
+                    <button class="btn btn-primary" data-action="analyze" data-file-id="${file.id}">
                         <i class="fas fa-microscope"></i>
                         Analyze
                     </button>
-                    <button class="btn btn-danger" onclick="fileManager.confirmDeleteFile(${file.id}, '${file.original_filename.replace(/'/g, "\\'")}')">
+                    <button class="btn btn-danger" data-action="delete" data-file-id="${file.id}" data-filename="${escapedNameForJs}">
                         <i class="fas fa-trash"></i>
                         Delete
                     </button>
                 </div>
-            </div>
-        `).join('');
+            `;
+            fragment.appendChild(card);
+        });
+        
+        filesGrid.appendChild(fragment);
+        this.attachFileEventListeners();
+    }
+
+    // Attach event listeners using delegation to prevent memory leaks
+    attachFileEventListeners() {
+        const filesGrid = window.ui.get('filesGrid');
+        if (!filesGrid) return;
+        
+        // Remove existing listeners
+        const existingListener = filesGrid._fileListener;
+        if (existingListener) {
+            filesGrid.removeEventListener('click', existingListener);
+        }
+        
+        // Add new delegated listener
+        const newListener = (e) => {
+            const button = e.target.closest('button[data-action]');
+            if (!button) return;
+            
+            const action = button.dataset.action;
+            const fileId = button.dataset.fileId;
+            const filename = button.dataset.filename;
+            
+            switch (action) {
+                case 'download':
+                    this.downloadFile(fileId, filename);
+                    break;
+                case 'analyze':
+                    this.selectAndAnalyze(fileId);
+                    break;
+                case 'delete':
+                    this.confirmDeleteFile(fileId, filename);
+                    break;
+            }
+        };
+        
+        filesGrid.addEventListener('click', newListener);
+        filesGrid._fileListener = newListener;
+    }
+
+    // Utility to escape HTML
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     // Update analysis dropdown
-    updateAnalysisDropdown() {
-        const analysisFileSelect = window.ui.get('analysisFileSelect');
-        if (!analysisFileSelect) return;
-        
-        analysisFileSelect.innerHTML = '<option value="" disabled selected>Select a PCAP file...</option>';
-        
-        this.filesData.forEach(file => {
-            const option = document.createElement('option');
-            option.value = file.id;
-            option.textContent = `${file.original_filename} (${file.size_formatted})`;
-            analysisFileSelect.appendChild(option);
-        });
-    }
-
     // Update statistics
     updateStatistics() {
         const totalSize = this.filesData.reduce((sum, file) => sum + file.size, 0);
@@ -156,57 +216,70 @@ class FileManager {
         });
     }
 
-    // Filter files based on search
+    // Filter files based on search (optimized for memory efficiency)
     filterFiles() {
         const searchInput = window.ui.get('searchInput');
         if (!searchInput) return;
         
-        const searchTerm = searchInput.value.toLowerCase();
+        const searchTerm = searchInput.value.toLowerCase().trim();
         
+        // Avoid creating new arrays when not necessary
         if (!searchTerm) {
-            this.filteredFiles = [...this.filesData];
+            if (this.filteredFiles !== this.filesData) {
+                this.filteredFiles = this.filesData.slice(); // Use slice instead of spread
+            }
         } else {
-            this.filteredFiles = this.filesData.filter(file => 
-                file.original_filename.toLowerCase().includes(searchTerm) ||
-                file.filename.toLowerCase().includes(searchTerm) ||
-                this.getFileExtension(file.filename).toLowerCase().includes(searchTerm)
-            );
+            // Use more efficient filtering with early termination
+            this.filteredFiles = [];
+            for (const file of this.filesData) {
+                const filename = (file.original_filename || '').toLowerCase();
+                const storedFilename = (file.filename || '').toLowerCase();
+                const extension = this.getFileExtension(file.filename).toLowerCase();
+                
+                if (filename.includes(searchTerm) || 
+                    storedFilename.includes(searchTerm) || 
+                    extension.includes(searchTerm)) {
+                    this.filteredFiles.push(file);
+                }
+            }
         }
         
-        this.renderFiles();
+        // Use requestAnimationFrame to prevent UI blocking
+        requestAnimationFrame(() => this.renderFiles());
     }
 
-    // Sort files
+    // Sort files (optimized for memory efficiency)
     sortFiles() {
         const sortSelect = window.ui.get('sortSelect');
         if (!sortSelect) return;
         
         const sortBy = sortSelect.value;
-        const sortedFiles = [...this.filteredFiles];
+        if (!sortBy || this.filteredFiles.length === 0) return;
         
+        // Sort in place instead of creating new array
         switch (sortBy) {
             case 'date-desc':
-                sortedFiles.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
+                this.filteredFiles.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
                 break;
             case 'date-asc':
-                sortedFiles.sort((a, b) => new Date(a.uploaded_at) - new Date(b.uploaded_at));
+                this.filteredFiles.sort((a, b) => new Date(a.uploaded_at) - new Date(b.uploaded_at));
                 break;
             case 'name-asc':
-                sortedFiles.sort((a, b) => a.original_filename.localeCompare(b.original_filename));
+                this.filteredFiles.sort((a, b) => a.original_filename.localeCompare(b.original_filename));
                 break;
             case 'name-desc':
-                sortedFiles.sort((a, b) => b.original_filename.localeCompare(a.original_filename));
+                this.filteredFiles.sort((a, b) => b.original_filename.localeCompare(a.original_filename));
                 break;
             case 'size-desc':
-                sortedFiles.sort((a, b) => b.size - a.size);
+                this.filteredFiles.sort((a, b) => (b.size || 0) - (a.size || 0));
                 break;
             case 'size-asc':
-                sortedFiles.sort((a, b) => a.size - b.size);
+                this.filteredFiles.sort((a, b) => (a.size || 0) - (b.size || 0));
                 break;
         }
         
-        this.filteredFiles = sortedFiles;
-        this.renderFiles();
+        // Use requestAnimationFrame to prevent UI blocking
+        requestAnimationFrame(() => this.renderFiles());
     }
 
     // Download file
@@ -243,8 +316,14 @@ class FileManager {
         try {
             const result = await window.api.delete(`/delete/${fileId}`);
             
+            // Remove from local data arrays to prevent memory leaks
+            this.filesData = this.filesData.filter(f => f.id !== fileId);
+            this.applyFilters();
+            
             window.ui.showStatus(result.message || 'File deleted successfully', 'success');
-            this.loadFiles();
+            
+            // Optionally trigger garbage collection
+            this.cleanupMemory();
             
         } catch (error) {
             console.error('Delete error:', error);
@@ -266,9 +345,39 @@ class FileManager {
             }
         }
         
+        // Clear local data arrays to prevent memory leaks
+        this.filesData = [];
+        this.filteredFiles = [];
+        this.renderFiles();
+        
         window.ui.hideLoading();
         window.ui.showStatus(`Deleted ${deletedCount} files`, 'success');
-        this.loadFiles();
+        
+        // Optionally trigger garbage collection
+        this.cleanupMemory();
+    }
+
+    // Add memory cleanup method
+    cleanupMemory() {
+        // Force garbage collection if available (only in development)
+        if (window.gc && typeof window.gc === 'function') {
+            setTimeout(() => window.gc(), 100);
+        }
+        
+        // Clean up any stale event listeners or data
+        this.checkAndCleanStaleReferences();
+    }
+
+    // Check for and clean stale references
+    checkAndCleanStaleReferences() {
+        // Remove any DOM elements that might be holding references
+        const staleCards = document.querySelectorAll('.file-card:not([data-file-id])');
+        staleCards.forEach(card => card.remove());
+        
+        // Validate filesData array for consistency
+        if (this.filesData.length > 1000) {
+            console.warn('Large files array detected:', this.filesData.length);
+        }
     }
 
     // Confirm delete file
@@ -279,18 +388,13 @@ class FileManager {
         );
     }
 
-    // Select file and switch to analysis tab
+    // Select file and navigate to analysis page
     selectAndAnalyze(fileId) {
-        const analysisFileSelect = window.ui.get('analysisFileSelect');
-        if (analysisFileSelect) {
-            analysisFileSelect.value = String(fileId);
-            window.ui.switchTab('analysis');
-            
-            // Trigger analysis refresh
-            if (window.analysisManager) {
-                window.analysisManager.refreshAnalysis();
-            }
-        }
+        // Store selected file ID in sessionStorage for the analysis page
+        sessionStorage.setItem('selectedFileId', fileId);
+        
+        // Navigate to analysis page
+        window.location.href = 'analysis.html';
     }
 
     // Utility function
