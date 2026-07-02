@@ -95,10 +95,22 @@ def init_database(db_path=None):
                 domain TEXT NOT NULL,
                 source TEXT NOT NULL, -- DNS|HTTP|TLS
                 count INTEGER NOT NULL DEFAULT 1,
+                verdict TEXT,
                 UNIQUE(pcap_id, ip, domain, source),
                 FOREIGN KEY(pcap_id) REFERENCES pcaps(id) ON DELETE CASCADE
             )
         ''')
+
+        # Backward-compatible migration: ensure 'verdict' and 'explanation' columns exist
+        try:
+            cols = cursor.execute("PRAGMA table_info(domains)").fetchall()
+            col_names = {c[1] for c in cols}
+            if 'verdict' not in col_names:
+                cursor.execute('ALTER TABLE domains ADD COLUMN verdict TEXT')
+            if 'explanation' not in col_names:
+                cursor.execute('ALTER TABLE domains ADD COLUMN explanation TEXT')
+        except Exception:
+            pass
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS flows (

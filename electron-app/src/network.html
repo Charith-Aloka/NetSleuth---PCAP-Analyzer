@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' http://localhost:5000;">
+    <title>Network Visualization - PCAP Analyzer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/network.css">
+</head>
+<body class="files-page">
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="app-title">
+                    <i class="fas fa-project-diagram"></i>
+                    <h1>Network Visualization</h1>
+                </div>
+                <nav class="top-nav">
+                    <a href="index.html" class="nav-link"><i class="fa-solid fa-folder-open"></i> Files</a>
+                    <a href="analysis.html" class="nav-link"><i class="fa-solid fa-microscope"></i> Analysis</a>
+                    <a href="investigation.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> IP Investigation</a>
+                    <a href="network.html" class="nav-link active"><i class="fa-solid fa-project-diagram"></i> Network Map</a>
+                    <a href="chat.html" class="nav-link"><i class="fa-solid fa-robot"></i> AI Assistant</a>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Controls Section -->
+            <section class="controls-section">
+                <div class="controls-card">
+                    <div class="control-group">
+                        <label for="fileSelect">
+                            <i class="fas fa-file"></i> PCAP File:
+                        </label>
+                        <select id="fileSelect" class="file-select">
+                            <option value="">Select a file...</option>
+                        </select>
+                    </div>
+                    <div class="control-actions">
+                        <button id="loadBtn" class="btn btn-primary">
+                            <i class="fas fa-sync"></i> Load Network
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Bar -->
+                <div id="statsBar" class="stats-bar" style="display: none;">
+                    <div class="stat-item">
+                        <i class="fas fa-circle blue"></i>
+                        <span id="statNodes">0</span> Nodes
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-exchange-alt green"></i>
+                        <span id="statEdges">0</span> Connections
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-home purple"></i>
+                        <span id="statInternal">0</span> Internal
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-globe orange"></i>
+                        <span id="statExternal">0</span> External
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-shield-alt red"></i>
+                        <span id="statThreats">0</span> Threats
+                    </div>
+                </div>
+            </section>
+
+            <!-- Graph Controls -->
+            <section id="graphControls" class="graph-controls" style="display: none;">
+                <div class="control-panel">
+                    <h3><i class="fas fa-sliders-h"></i> View Controls</h3>
+                    <div class="control-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="showInternal" checked>
+                            <span>Show Internal IPs</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="showExternal" checked>
+                            <span>Show External IPs</span>
+                        </label>
+                    </div>
+                    <div class="control-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="physicsEnabled" checked>
+                            <span>Enable Physics</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="showLabels" checked>
+                            <span>Show Labels</span>
+                        </label>
+                    </div>
+                    <div class="control-row">
+                        <label for="layoutSelect">Layout:</label>
+                        <select id="layoutSelect" class="layout-select">
+                            <option value="forceAtlas2Based">Force Atlas</option>
+                            <option value="hierarchical">Hierarchical</option>
+                            <option value="barnesHut">Barnes Hut</option>
+                        </select>
+                    </div>
+                    <div class="control-row">
+                        <button id="resetView" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-compress"></i> Reset View
+                        </button>
+                        <button id="exportBtn" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-download"></i> Export Image
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="legend-panel">
+                    <h3><i class="fas fa-info-circle"></i> Legend</h3>
+                    <div class="legend-item">
+                        <div class="legend-node internal"></div>
+                        <span>Internal Device</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-node external"></div>
+                        <span>External IP</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-node malicious"></div>
+                        <span>Malicious</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-node suspicious"></div>
+                        <span>Suspicious</span>
+                    </div>
+                    <div class="legend-edge tcp"></div>
+                    <span>TCP Connection</span>
+                    <div class="legend-edge udp"></div>
+                    <span>UDP Connection</span>
+                </div>
+            </section>
+
+            <!-- Network Graph Container -->
+            <section class="graph-section">
+                <div id="loadingGraph" class="loading-state" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Loading network graph...</p>
+                </div>
+                <div id="networkGraph" class="network-graph"></div>
+                <div id="emptyState" class="empty-state">
+                    <i class="fas fa-project-diagram"></i>
+                    <h2>No Network Graph Loaded</h2>
+                    <p>Select a PCAP file and click "Load Network" to visualize the network topology</p>
+                </div>
+            </section>
+
+            <!-- Node Details Panel -->
+            <div id="nodeDetails" class="node-details" style="display: none;">
+                <div class="details-header">
+                    <h3 id="nodeTitle">Node Details</h3>
+                    <button id="closeDetails" class="close-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="nodeContent" class="details-content">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/network.js"></script>
+</body>
+</html>

@@ -1,308 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' http://localhost:5000;">
-    <title>PCAP Network Analyzer - Analysis</title>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- Custom Styles -->
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/analysis-redesign.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' http://localhost:5000;">
+  <title>PCAP Analysis</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/analysis-redesign.css" />
 </head>
-<body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
-            <div class="header-content">
-                <div class="app-title">
-                    <i class="fas fa-network-wired"></i>
-                    <h1>PCAP Network Analyzer</h1>
-                </div>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" onclick="window.location.href='index.html'">
-                        <i class="fas fa-arrow-left"></i> Back to Files
-                    </button>
-                </div>
+<body class="analysis-page">
+  <div class="app-container">
+    <!-- Nav bar -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="app-title">
+          <i class="fas fa-network-wired"></i>
+          <h1>PCAP Analysis</h1>
+        </div>
+        <nav class="top-nav">
+          <a href="index.html" class="nav-link"><i class="fa-solid fa-folder-open"></i> Files</a>
+          <a href="analysis.html" class="nav-link active"><i class="fa-solid fa-microscope"></i> Analysis</a>
+          <a href="investigation.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> IP Investigation</a>
+          <a href="network.html" class="nav-link"><i class="fa-solid fa-project-diagram"></i> Network Map</a>
+          <a href="chat.html" class="nav-link"><i class="fa-solid fa-robot"></i> AI Assistant</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <!-- Summary Section -->
+      <section class="summary-section">
+        <h2><i class="fa-solid fa-chart-line"></i> Capture Summary</h2>
+        <div id="summaryCards" class="summary-grid"></div>
+        <div id="summaryPeriod" class="analysis-meta"></div>
+      </section>
+
+      <!-- Tables Section -->
+      <section class="tables-section">
+        <!-- Top IPs -->
+        <div class="data-table-card">
+          <div class="table-header">
+            <h3><i class="fa-solid fa-network-wired"></i> Top IPs</h3>
+            <span class="badge" id="ipsBadge">0</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>IP</th>
+                  <th>Packets</th>
+                  <th>First Seen</th>
+                  <th>Last Seen</th>
+                  <th>Duration</th>
+                  <th>Bytes Sent</th>
+                </tr>
+              </thead>
+              <tbody id="ipsTbody"></tbody>
+            </table>
+          </div>
+          <div class="table-pagination">
+            <div class="page-info" id="ipsPageInfo"></div>
+            <div>
+              <button id="ipsPrev" class="btn-pagination"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+              <button id="ipsNext" class="btn-pagination">Next <i class="fa-solid fa-chevron-right"></i></button>
             </div>
-        </header>
+          </div>
+        </div>
 
-        <!-- Main Content -->
-        <main class="app-main">
-            <!-- File Selection & Analysis Controls -->
-            <section class="analysis-controls-section">
-                <div class="controls-card">
-                    <div class="control-group">
-                        <label for="fileSelect"><i class="fas fa-file-alt"></i> Select PCAP File:</label>
-                        <select id="fileSelect" class="file-select">
-                            <option value="">Loading files...</option>
-                        </select>
-                    </div>
-                    <div class="control-actions">
-                        <button id="analyzeBtn" class="btn btn-primary" onclick="startAnalysis()" disabled>
-                            <i class="fas fa-play-circle"></i> Analyze
-                        </button>
-                        <button id="assessBtn" class="btn btn-warning" onclick="assessThreats()" disabled>
-                            <i class="fas fa-shield-virus"></i> Assess Threats
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Loading Overlay -->
-            <div id="loadingOverlay" class="loading-overlay" style="display: none;">
-                <div class="loading-content">
-                    <div class="spinner"></div>
-                    <p id="loadingMessage">Analyzing PCAP file...</p>
-                </div>
+        <!-- Domains -->
+        <div class="data-table-card">
+          <div class="table-header">
+            <h3><i class="fa-solid fa-globe"></i> Domains</h3>
+            <span class="badge" id="domainsBadge">0</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr><th>Domain</th><th>Source</th><th>Accessed By</th><th>Count</th><th>Verdict</th><th>Explanation</th></tr>
+              </thead>
+              <tbody id="domainsTbody"></tbody>
+            </table>
+          </div>
+          <div class="table-pagination">
+            <div class="page-info" id="domainsPageInfo"></div>
+            <div>
+              <button id="domainsPrev" class="btn-pagination"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+              <button id="domainsNext" class="btn-pagination">Next <i class="fa-solid fa-chevron-right"></i></button>
             </div>
+          </div>
+        </div>
 
-            <!-- Analysis Summary Section -->
-            <section id="summarySection" class="summary-section" style="display: none;">
-                <h2><i class="fas fa-chart-bar"></i> Analysis Summary</h2>
-                <div class="summary-grid">
-                    <div class="summary-card">
-                        <div class="card-icon blue">
-                            <i class="fas fa-globe"></i>
-                        </div>
-                        <div class="card-content">
-                            <h3 id="uniqueIPs">0</h3>
-                            <p>Unique IP Addresses</p>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="card-icon green">
-                            <i class="fas fa-server"></i>
-                        </div>
-                        <div class="card-content">
-                            <h3 id="uniqueWebsites">0</h3>
-                            <p>Websites Accessed</p>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="card-icon purple">
-                            <i class="fas fa-laptop"></i>
-                        </div>
-                        <div class="card-content">
-                            <h3 id="uniqueDevices">0</h3>
-                            <p>Network Devices</p>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="card-icon orange">
-                            <i class="fas fa-exchange-alt"></i>
-                        </div>
-                        <div class="card-content">
-                            <h3 id="totalPackets">0</h3>
-                            <p>Total Packets</p>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="card-icon teal">
-                            <i class="fas fa-database"></i>
-                        </div>
-                        <div class="card-content">
-                            <h3 id="totalBytes">0 B</h3>
-                            <p>Data Transferred</p>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="card-icon red">
-                            <i class="fas fa-shield-virus"></i>
-                        </div>
-                        <div class="card-content">
-                            <h3 id="threatCount">0</h3>
-                            <p>Security Threats</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="analysis-meta">
-                    <p><i class="fas fa-clock"></i> Last Analyzed: <span id="analyzedAt">-</span></p>
-                </div>
-            </section>
+        <!-- Devices -->
+        <div class="data-table-card">
+          <div class="table-header">
+            <h3><i class="fa-solid fa-desktop"></i> Devices</h3>
+            <span class="badge" id="devicesBadge">0</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr><th>IP</th><th>MAC</th><th>Hostname</th><th>First Seen</th><th>Last Seen</th></tr>
+              </thead>
+              <tbody id="devicesTbody"></tbody>
+            </table>
+          </div>
+          <div class="table-pagination">
+            <div class="page-info" id="devicesPageInfo"></div>
+            <div>
+              <button id="devicesPrev" class="btn-pagination"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+              <button id="devicesNext" class="btn-pagination">Next <i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
 
-            <!-- Data Tables Section -->
-            <section id="tablesSection" class="tables-section" style="display: none;">
-                
-                <!-- All IP Addresses -->
-                <div class="data-table-card">
-                    <div class="table-header">
-                        <h3><i class="fas fa-globe"></i> All IP Addresses</h3>
-                        <span class="badge" id="ipsBadge">0</span>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>IP Address</th>
-                                    <th>Packet Count</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ipsTableBody">
-                                <tr><td colspan="2" class="text-center">No data</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="table-pagination">
-                        <button class="btn-pagination" id="ipsPrev" onclick="changePage('ips', -1)" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <span class="page-info" id="ipsPageInfo">Page 1 of 1</span>
-                        <button class="btn-pagination" id="ipsNext" onclick="changePage('ips', 1)" disabled>
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                </div>
+        <!-- Flows -->
+        <div class="data-table-card">
+          <div class="table-header">
+            <h3><i class="fa-solid fa-arrows-turn-to-dots"></i> Flows</h3>
+            <span class="badge" id="flowsBadge">0</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr><th>Src IP</th><th>SPort</th><th>Dst IP</th><th>DPort</th><th>Proto</th><th>Packets</th><th>Bytes</th><th>First</th><th>Last</th></tr>
+              </thead>
+              <tbody id="flowsTbody"></tbody>
+            </table>
+          </div>
+          <div class="table-pagination">
+            <div class="page-info" id="flowsPageInfo"></div>
+            <div>
+              <button id="flowsPrev" class="btn-pagination"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+              <button id="flowsNext" class="btn-pagination">Next <i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
 
-                <!-- Network Devices -->
-                <div class="data-table-card">
-                    <div class="table-header">
-                        <h3><i class="fas fa-laptop"></i> Network Devices</h3>
-                        <span class="badge" id="devicesBadge">0</span>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>IP Address</th>
-                                    <th>MAC Address</th>
-                                    <th>Hostname</th>
-                                    <th>First Seen</th>
-                                    <th>Last Seen</th>
-                                </tr>
-                            </thead>
-                            <tbody id="devicesTableBody">
-                                <tr><td colspan="5" class="text-center">No data</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="table-pagination">
-                        <button class="btn-pagination" id="devicesPrev" onclick="changePage('devices', -1)" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <span class="page-info" id="devicesPageInfo">Page 1 of 1</span>
-                        <button class="btn-pagination" id="devicesNext" onclick="changePage('devices', 1)" disabled>
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                </div>
+    <div class="status-container" id="statusContainer"></div>
+  </div>
 
-                <!-- Domains & Services -->
-                <div class="data-table-card">
-                    <div class="table-header">
-                        <h3><i class="fas fa-server"></i> Domains & Services</h3>
-                        <span class="badge" id="domainsBadge">0</span>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Source IP</th>
-                                    <th>Domain/Service</th>
-                                    <th>Source Type</th>
-                                    <th>Request Count</th>
-                                </tr>
-                            </thead>
-                            <tbody id="domainsTableBody">
-                                <tr><td colspan="4" class="text-center">No data</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="table-pagination">
-                        <button class="btn-pagination" id="domainsPrev" onclick="changePage('domains', -1)" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <span class="page-info" id="domainsPageInfo">Page 1 of 1</span>
-                        <button class="btn-pagination" id="domainsNext" onclick="changePage('domains', 1)" disabled>
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- User Activity -->
-                <div class="data-table-card">
-                    <div class="table-header">
-                        <h3><i class="fas fa-user"></i> User Activity</h3>
-                        <span class="badge" id="userActivityBadge">0</span>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>IP Address</th>
-                                    <th>MAC Address</th>
-                                    <th>Hostname</th>
-                                    <th>Accessed Domains</th>
-                                    <th>Time Range</th>
-                                </tr>
-                            </thead>
-                            <tbody id="userActivityTableBody">
-                                <tr><td colspan="5" class="text-center">No data</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="table-pagination">
-                        <button class="btn-pagination" id="userActivityPrev" onclick="changePage('user_activity', -1)" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <span class="page-info" id="userActivityPageInfo">Page 1 of 1</span>
-                        <button class="btn-pagination" id="userActivityNext" onclick="changePage('user_activity', 1)" disabled>
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Threat Assessment (Gemini) -->
-                <div class="data-table-card threat-card">
-                    <div class="table-header">
-                        <h3><i class="fas fa-shield-virus"></i> Threat Assessment (Gemini AI)</h3>
-                        <span class="badge" id="assessmentsBadge">0</span>
-                    </div>
-                    <div id="threatEmptyState" class="empty-state">
-                        <i class="fas fa-shield-alt"></i>
-                        <p>No threat assessment available</p>
-                        <button class="btn btn-primary" onclick="assessThreats()">
-                            <i class="fas fa-play"></i> Run Assessment
-                        </button>
-                    </div>
-                    <div class="table-container" id="assessmentsTableContainer" style="display: none;">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Domain</th>
-                                    <th>Verdict</th>
-                                    <th>Reasons</th>
-                                    <th>Assessed At</th>
-                                </tr>
-                            </thead>
-                            <tbody id="assessmentsTableBody">
-                                <tr><td colspan="4" class="text-center">No data</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="table-pagination" id="assessmentsPagination" style="display: none;">
-                        <button class="btn-pagination" id="assessmentsPrev" onclick="changePage('assessments', -1)" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <span class="page-info" id="assessmentsPageInfo">Page 1 of 1</span>
-                        <button class="btn-pagination" id="assessmentsNext" onclick="changePage('assessments', 1)" disabled>
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                </div>
-
-            </section>
-        </main>
-
-        <!-- Toast Notification Container -->
-        <div id="toastContainer" class="toast-container"></div>
-    </div>
-
-    <!-- JavaScript -->
-    <script src="js/api.js"></script>
-    <script src="js/analysis-redesign.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/analysis.js"></script>
 </body>
 </html>

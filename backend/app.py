@@ -7,6 +7,10 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from routes.ingest import ingest_bp
 from routes.analyze import analyze_bp
+from routes.investigation import investigation_bp
+from routes.network import network_bp
+from routes.threat_intel import threat_intel_bp
+from routes.chat import chat_bp
 from utils.db import init_database
 import os
 
@@ -24,6 +28,10 @@ init_database(DB_PATH)
 # Register routes
 app.register_blueprint(ingest_bp, url_prefix='/api')
 app.register_blueprint(analyze_bp, url_prefix='/api')
+app.register_blueprint(investigation_bp, url_prefix='/api')
+app.register_blueprint(network_bp, url_prefix='/api')
+app.register_blueprint(threat_intel_bp, url_prefix='/api')
+app.register_blueprint(chat_bp)  # Already has /api/chat prefix
 
 @app.route('/')
 def index():
