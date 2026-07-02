@@ -242,11 +242,6 @@ Packet captures are among the most sensitive artefacts in security work - they c
 - ✅ Only capture and analyze traffic on networks/systems you **own or are authorized** to inspect. Unauthorized interception may be illegal.
 - 🎓 Intended for **education, lab environments, and authorized security assessments** only.
 
-### 🧪 Known limitations (course project)
-- The backend runs Flask's development server with `debug=True` - **not for production/network exposure** as-is.
-- Captures are stored as raw BLOBs in SQLite without at-rest encryption; treat the DB file as sensitive.
-- Third-party lookups depend on free-tier rate limits (VirusTotal ~4 req/min, AbuseIPDB ~1000 req/day).
-
 ---
 
 ## 📄 License
