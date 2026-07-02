@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IP Investigation - NetSleuth</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/investigation.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="files-page">
+  <div class="app-container">
+    <!-- Navigation -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="app-title">
+          <i class="fas fa-network-wired"></i>
+          <h1>IP Investigation</h1>
+        </div>
+        <nav class="top-nav">
+          <a href="index.html" class="nav-link"><i class="fa-solid fa-folder-open"></i> Files</a>
+          <a href="analysis.html" class="nav-link"><i class="fa-solid fa-microscope"></i> Analysis</a>
+          <a href="investigation.html" class="nav-link active"><i class="fa-solid fa-magnifying-glass-chart"></i> IP Investigation</a>
+          <a href="network.html" class="nav-link"><i class="fa-solid fa-project-diagram"></i> Network Map</a>
+          <a href="chat.html" class="nav-link"><i class="fa-solid fa-robot"></i> AI Assistant</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <!-- Search Section -->
+      <div class="search-section">
+        <div class="search-card">
+          <h3><i class="fa-solid fa-search"></i> Search IP Address</h3>
+          <div class="search-controls">
+            <input type="text" id="ipInput" placeholder="Enter IP address (e.g., 172.16.165.2)" class="ip-input">
+            <button id="investigateBtn" class="btn btn-primary">
+              <i class="fa-solid fa-search"></i> Investigate
+            </button>
+          </div>
+          <div class="quick-select">
+            <span>Quick Select:</span>
+            <div id="ipList" class="ip-chips"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading Indicator -->
+      <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Analyzing IP address and generating AI report...</p>
+      </div>
+
+      <!-- Report Section -->
+      <div id="reportSection" class="report-section" style="display: none;">
+      
+      <!-- IP Overview Card -->
+      <div class="report-card overview-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-info-circle"></i> IP Overview</h3>
+        </div>
+        <div class="card-body">
+          <div class="overview-grid">
+            <div class="overview-item">
+              <span class="label">IP Address:</span>
+              <span class="value" id="overviewIP">-</span>
+            </div>
+            <div class="overview-item">
+              <span class="label">MAC Address:</span>
+              <span class="value" id="overviewMAC">-</span>
+            </div>
+            <div class="overview-item">
+              <span class="label">First Seen:</span>
+              <span class="value" id="overviewFirst">-</span>
+            </div>
+            <div class="overview-item">
+              <span class="label">Last Seen:</span>
+              <span class="value" id="overviewLast">-</span>
+            </div>
+            <div class="overview-item">
+              <span class="label">Active Duration:</span>
+              <span class="value" id="overviewDuration">-</span>
+            </div>
+            <div class="overview-item">
+              <span class="label">Total Packets:</span>
+              <span class="value" id="overviewPackets">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Threat Intelligence Card -->
+      <div class="report-card threat-intel-card" id="threatIntelCard" style="display: none;">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-shield-alt"></i> Threat Intelligence</h3>
+          <button id="refreshThreatIntel" class="btn-refresh" title="Refresh threat data">
+            <i class="fa-solid fa-sync"></i>
+          </button>
+        </div>
+        <div class="card-body">
+          <div id="threatIntelLoading" class="threat-loading">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <span>Checking threat databases...</span>
+          </div>
+          <div id="threatIntelContent" style="display: none;">
+            <!-- Overall Threat Score -->
+            <div class="threat-overall">
+              <div class="threat-score-display">
+                <div class="score-circle" id="threatScoreCircle">
+                  <span id="threatScoreNumber">0</span>
+                </div>
+                <div class="threat-level-badge" id="threatLevelBadge">CLEAN</div>
+              </div>
+              <div class="threat-summary" id="threatSummary">
+                No significant threats detected
+              </div>
+            </div>
+
+            <!-- VirusTotal Results -->
+            <div class="intel-source" id="virusTotalSection" style="display: none;">
+              <div class="source-header">
+                <img src="https://www.virustotal.com/gui/images/favicon.png" width="20" height="20" alt="VT" onerror="this.style.display='none'">
+                <h4>VirusTotal</h4>
+                <span class="source-badge" id="vtBadge">-</span>
+              </div>
+              <div class="source-details">
+                <div class="detail-row">
+                  <span>Detection Ratio:</span>
+                  <span id="vtRatio">-</span>
+                </div>
+                <div class="detail-row">
+                  <span>Malicious:</span>
+                  <span class="text-danger" id="vtMalicious">-</span>
+                </div>
+                <div class="detail-row">
+                  <span>Suspicious:</span>
+                  <span class="text-warning" id="vtSuspicious">-</span>
+                </div>
+                <div class="detail-row">
+                  <span>AS Owner:</span>
+                  <span id="vtASOwner">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- AbuseIPDB Results -->
+            <div class="intel-source" id="abuseIPDBSection" style="display: none;">
+              <div class="source-header">
+                <i class="fa-solid fa-flag text-danger"></i>
+                <h4>AbuseIPDB</h4>
+                <span class="source-badge" id="abuseIPDBBadge">-</span>
+              </div>
+              <div class="source-details">
+                <div class="detail-row">
+                  <span>Abuse Confidence:</span>
+                  <span id="abuseConfidence">-</span>
+                </div>
+                <div class="detail-row">
+                  <span>Total Reports:</span>
+                  <span id="abuseReports">-</span>
+                </div>
+                <div class="detail-row">
+                  <span>Last Reported:</span>
+                  <span id="abuseLastReported">-</span>
+                </div>
+                <div class="detail-row">
+                  <span>ISP:</span>
+                  <span id="abuseISP">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- No Data Message -->
+            <div id="noThreatIntelData" style="display: none;">
+              <p class="text-muted text-center">
+                <i class="fa-solid fa-info-circle"></i>
+                Threat intelligence services not configured. Add API keys to enable.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Analysis Card -->
+      <div class="report-card ai-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-brain"></i> AI Security Assessment</h3>
+          <div class="risk-badge" id="riskBadge">UNKNOWN</div>
+        </div>
+        <div class="card-body">
+          <div class="ai-summary" id="aiSummary">
+            <p>Analyzing...</p>
+          </div>
+          <div class="ai-score">
+            <span>Risk Score:</span>
+            <div class="score-bar">
+              <div class="score-fill" id="scoreFill" style="width: 0%"></div>
+            </div>
+            <span id="scoreValue">0/100</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Traffic Statistics Card -->
+      <div class="report-card traffic-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-chart-bar"></i> Traffic Statistics</h3>
+        </div>
+        <div class="card-body">
+          <div class="traffic-grid">
+            <div class="traffic-stat">
+              <i class="fa-solid fa-arrow-up text-success"></i>
+              <div>
+                <div class="stat-label">Outgoing</div>
+                <div class="stat-value" id="trafficOutgoing">0 KB</div>
+                <div class="stat-sub" id="trafficOutgoingPackets">0 packets</div>
+              </div>
+            </div>
+            <div class="traffic-stat">
+              <i class="fa-solid fa-arrow-down text-info"></i>
+              <div>
+                <div class="stat-label">Incoming</div>
+                <div class="stat-value" id="trafficIncoming">0 KB</div>
+                <div class="stat-sub" id="trafficIncomingPackets">0 packets</div>
+              </div>
+            </div>
+            <div class="traffic-stat">
+              <i class="fa-solid fa-exchange-alt text-primary"></i>
+              <div>
+                <div class="stat-label">Total</div>
+                <div class="stat-value" id="trafficTotal">0 KB</div>
+                <div class="stat-sub" id="trafficTotalPackets">0 packets</div>
+              </div>
+            </div>
+          </div>
+          <div class="protocol-breakdown">
+            <h4>Protocol Distribution</h4>
+            <div id="protocolList" class="protocol-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Domains Card -->
+      <div class="report-card domains-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-globe"></i> Domains Accessed</h3>
+          <span class="badge" id="domainTotal">0</span>
+        </div>
+        <div class="card-body">
+          <div class="verdict-summary">
+            <div class="verdict-item safe">
+              <i class="fa-solid fa-check-circle"></i>
+              <span id="domainSafe">0</span> Safe
+            </div>
+            <div class="verdict-item suspicious">
+              <i class="fa-solid fa-exclamation-triangle"></i>
+              <span id="domainSuspicious">0</span> Suspicious
+            </div>
+            <div class="verdict-item malicious">
+              <i class="fa-solid fa-skull-crossbones"></i>
+              <span id="domainMalicious">0</span> Malicious
+            </div>
+            <div class="verdict-item unknown">
+              <i class="fa-solid fa-question-circle"></i>
+              <span id="domainUnknown">0</span> Unknown
+            </div>
+          </div>
+          
+          <div id="riskyDomains" class="risky-domains"></div>
+          
+          <details class="all-domains-section">
+            <summary>View All Domains (<span id="allDomainsCount">0</span>)</summary>
+            <div id="allDomainsList" class="domains-list"></div>
+          </details>
+        </div>
+      </div>
+
+      <!-- AI Findings Card -->
+      <div class="report-card findings-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-list-check"></i> Key Findings</h3>
+        </div>
+        <div class="card-body">
+          <ul id="findingsList" class="findings-list"></ul>
+        </div>
+      </div>
+
+      <!-- Recommendations Card -->
+      <div class="report-card recommendations-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-lightbulb"></i> Recommendations</h3>
+        </div>
+        <div class="card-body">
+          <ul id="recommendationsList" class="recommendations-list"></ul>
+        </div>
+      </div>
+
+      <!-- Top Connections Card -->
+      <div class="report-card connections-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-network-wired"></i> Top Connections</h3>
+        </div>
+        <div class="card-body">
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Destination</th>
+                  <th>Port</th>
+                  <th>Protocol</th>
+                  <th>Packets</th>
+                  <th>Bytes</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody id="connectionsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      </div>
+    </main>
+
+    <!-- Status Messages -->
+    <div id="statusContainer"></div>
+  </div>
+
+  <script src="js/ui.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/investigation.js"></script>
+</body>
+</html>

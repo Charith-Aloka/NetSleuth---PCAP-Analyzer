@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' http://localhost:5000;">
+    <title>AI Assistant - NetSleuth</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/chat.css">
+</head>
+<body class="files-page">
+    <div class="app-container">
+        <!-- Header with consistent navbar -->
+        <header class="app-header">
+          <div class="header-content">
+            <div class="app-title">
+              <i class="fas fa-robot"></i>
+              <h1>AI Assistant</h1>
+            </div>
+            <nav class="top-nav">
+              <a href="index.html" class="nav-link"><i class="fa-solid fa-folder-open"></i> Files</a>
+              <a href="analysis.html" class="nav-link"><i class="fa-solid fa-microscope"></i> Analysis</a>
+              <a href="investigation.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> IP Investigation</a>
+              <a href="network.html" class="nav-link"><i class="fa-solid fa-project-diagram"></i> Network Map</a>
+              <a href="chat.html" class="nav-link active"><i class="fa-solid fa-robot"></i> AI Assistant</a>
+            </nav>
+          </div>
+        </header>
+
+        <div class="chat-container">
+        <!-- Sidebar with PCAP selector -->
+        <aside class="chat-sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-database"></i> Context</h3>
+            </div>
+            
+            <div class="context-selector">
+                <label for="pcapSelector">
+                    <i class="fas fa-file-code"></i> PCAP File
+                </label>
+                <select id="pcapSelector">
+                    <option value="">All Files (General)</option>
+                </select>
+                <p class="help-text">Select a PCAP to ask specific questions about it</p>
+            </div>
+
+            <div class="suggestions-container">
+                <h4><i class="fas fa-lightbulb"></i> Suggested Questions</h4>
+                <div id="suggestionsList" class="suggestions-list">
+                    <!-- Suggestions will be loaded here -->
+                </div>
+            </div>
+
+            <div class="chat-actions">
+                <button id="clearChatBtn" class="btn-clear">
+                    <i class="fas fa-trash"></i> Clear Chat
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main chat area -->
+        <main class="chat-main">
+            <!-- Chat header -->
+            <div class="chat-header">
+                <div class="header-info">
+                    <h2>AI Assistant</h2>
+                    <p class="status-indicator">
+                        <span class="status-dot online"></span>
+                        Ready to help
+                    </p>
+                </div>
+                <div class="header-actions">
+                    <button id="exportChatBtn" class="btn-icon" title="Export chat">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat messages -->
+            <div class="chat-messages" id="chatMessages">
+                <!-- Welcome message -->
+                <div class="message assistant-message welcome-message">
+                    <div class="message-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-sender">NetSleuth AI</span>
+                            <span class="message-time" id="welcomeTime"></span>
+                        </div>
+                        <div class="message-text">
+                            <h3>👋 Hello! I'm your network security assistant.</h3>
+                            <p>I can help you understand your network traffic, identify threats, and answer questions about your PCAP files.</p>
+                            <p><strong>Try asking:</strong></p>
+                            <ul>
+                                <li>"What are the top threats in my network?"</li>
+                                <li>"Show me suspicious IP addresses"</li>
+                                <li>"Explain the traffic patterns"</li>
+                                <li>"Which protocols are most common?"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat input -->
+            <div class="chat-input-container">
+                <form id="chatForm" class="chat-form">
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="messageInput" 
+                            placeholder="Ask me anything about your network traffic..."
+                            rows="1"
+                            maxlength="2000"
+                        ></textarea>
+                        <div class="input-actions">
+                            <span class="char-count" id="charCount">0/2000</span>
+                            <button type="submit" id="sendBtn" class="btn-send">
+                                <i class="fas fa-paper-plane"></i>
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </main>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/chat.js"></script>
+</body>
+</html>

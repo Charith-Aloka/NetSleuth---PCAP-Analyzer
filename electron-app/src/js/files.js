@@ -177,6 +177,9 @@ class FileManager {
             const button = e.target.closest('button[data-action]');
             if (!button) return;
             
+            // Prevent double-clicks
+            if (button.disabled) return;
+            
             const action = button.dataset.action;
             const fileId = button.dataset.fileId;
             const filename = button.dataset.filename;
@@ -186,6 +189,14 @@ class FileManager {
                     this.downloadFile(fileId, filename);
                     break;
                 case 'analyze':
+                    // Disable button and show loading state
+                    button.disabled = true;
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+                    
+                    // Store original state to restore if needed
+                    button._originalHTML = originalHTML;
+                    
                     this.selectAndAnalyze(fileId);
                     break;
                 case 'delete':
@@ -390,11 +401,48 @@ class FileManager {
 
     // Select file and navigate to analysis page
     selectAndAnalyze(fileId) {
-        // Store selected file ID in sessionStorage for the analysis page
+        // Store selected file ID
         sessionStorage.setItem('selectedFileId', fileId);
-        
-        // Navigate to analysis page
-        window.location.href = 'analysis.html';
+
+        // Show loading overlay with progress messages
+        const loadingOverlay = window.ui.get('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'flex';
+            const loadingText = loadingOverlay.querySelector('p');
+            if (loadingText) {
+                loadingText.textContent = 'Starting analysis...';
+            }
+        }
+
+        // Kick off backend analysis (now includes automatic Gemini domain assessment)
+        (async () => {
+            try {
+                // Analyze PCAP (backend automatically calls Gemini to assess domains)
+                if (loadingOverlay) {
+                    const loadingText = loadingOverlay.querySelector('p');
+                    if (loadingText) loadingText.textContent = 'Analyzing PCAP packets and classifying domains...';
+                }
+                window.ui.showStatus('Analyzing PCAP and classifying domains with AI…', 'info');
+                await window.api.triggerAnalysis(fileId);
+                
+                window.ui.showStatus('Analysis complete!', 'success');
+            } catch (e) {
+                // Proceed anyway but warn
+                console.error('Analysis error:', e);
+                window.ui.showStatus(`Analysis completed with warnings: ${e.message || e}`, 'warning');
+            } finally {
+                // Navigate after background work
+                if (loadingOverlay) {
+                    const loadingText = loadingOverlay.querySelector('p');
+                    if (loadingText) loadingText.textContent = 'Loading results...';
+                }
+                
+                // Small delay to show final message
+                setTimeout(() => {
+                    window.location.href = 'analysis.html';
+                }, 500);
+            }
+        })();
     }
 
     // Utility function

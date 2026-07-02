@@ -3,3 +3,5 @@ flask-cors==4.0.0
 werkzeug==2.3.7
 scapy==2.5.0
 google-generativeai
+requests==2.31.0
+python-dotenv==1.0.0

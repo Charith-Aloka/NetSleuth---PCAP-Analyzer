@@ -114,12 +114,64 @@ class APIClient {
     }
 
     // Threat assessment
-    async assessDomains(fileId) {
-        return this.post(`/analysis/${fileId}/assess_domains`);
+    async assessDomains(fileId, limit = 50) {
+        return this.post(`/analysis/${fileId}/assess_domains`, { limit });
     }
 
     async getAssessments(fileId) {
         return this.get(`/analysis/${fileId}/assessments`);
+    }
+
+    // Analysis endpoints
+    async triggerAnalysis(fileId) {
+        return this.post(`/analyze/${fileId}`);
+    }
+
+    async getAnalysisSummary(fileId) {
+        return this.get(`/analysis/${fileId}/summary`);
+    }
+
+    async getIPs(fileId, page = 1, pageSize = 10) {
+        return this.get(`/analysis/${fileId}/ips`, { page, page_size: pageSize });
+    }
+
+    async getDomains(fileId, page = 1, pageSize = 10) {
+        return this.get(`/analysis/${fileId}/domains`, { page, page_size: pageSize });
+    }
+
+    async getDevices(fileId, page = 1, pageSize = 10) {
+        return this.get(`/analysis/${fileId}/devices`, { page, page_size: pageSize });
+    }
+
+    async getFlows(fileId, page = 1, pageSize = 10) {
+        return this.get(`/analysis/${fileId}/flows`, { page, page_size: pageSize });
+    }
+
+    // IP Investigation endpoints
+    async investigateIP(fileId, ipAddress) {
+        return this.get(`/investigation/${fileId}/${ipAddress}`);
+    }
+
+    async getInvestigationIPs(fileId) {
+        return this.get(`/investigation/${fileId}/ips`);
+    }
+
+    // Network Visualization endpoint
+    async getNetworkGraph(fileId) {
+        return this.get(`/network-graph/${fileId}`);
+    }
+
+    // Threat Intelligence endpoints
+    async checkIPThreat(ipAddress) {
+        return this.get(`/threat-intel/check/${ipAddress}`);
+    }
+
+    async scanPcapThreats(fileId) {
+        return this.post(`/threat-intel/pcap/${fileId}/scan`);
+    }
+
+    async getThreatIntelStatus() {
+        return this.get(`/threat-intel/status`);
     }
 }
 

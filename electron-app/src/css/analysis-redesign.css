@@ -1,6 +1,6 @@
 /* ========================================
    PCAP Analyzer - Redesigned Analysis Page
-   Modern, Clean, Responsive Design
+   Modern, Clean, Dark Theme Design
    ======================================== */
 
 :root {
@@ -35,19 +35,28 @@
     --spacing-xl: 2rem;
 }
 
-/* Dark mode support (optional) */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg-primary: #0f172a;
-        --bg-secondary: #1e293b;
-        --bg-card: #1e293b;
-        
-        --text-primary: #f1f5f9;
-        --text-secondary: #cbd5e1;
-        --text-muted: #64748b;
-        
-        --border-color: #334155;
-    }
+/* Analysis page dark theme */
+.analysis-page {
+    /* Dark surface palette */
+    --bg-primary: #0d1117;
+    --bg-secondary: #0b0f14;
+    --bg-card: #141a22;
+    --bg-tertiary: #141a22;
+    --border-color: #1f2937;
+
+    /* Typography */
+    --text-primary: #e5e7eb;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+
+    /* Accents */
+    --primary-color: #22d3ee;
+    --primary-hover: #06b6d4;
+    --secondary-color: #60a5fa;
+    
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
 }
 
 /* Reset & Base Styles */
@@ -64,11 +73,7 @@ body {
     line-height: 1.6;
 }
 
-.app-container {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
+.app-container { min-height: 100vh; display: flex; flex-direction: column; }
 
 /* Header Styles */
 .app-header {
@@ -106,14 +111,41 @@ body {
     color: var(--text-primary);
 }
 
-/* Main Content */
-.app-main {
-    flex: 1;
-    max-width: 1400px;
-    width: 100%;
-    margin: 0 auto;
-    padding: var(--spacing-xl);
+/* Top Navigation */
+.top-nav {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: center;
 }
+
+.top-nav a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.top-nav a:hover {
+    color: var(--primary-color);
+    background: rgba(34, 211, 238, 0.1);
+}
+
+.top-nav a.active {
+    color: var(--primary-color);
+    background: rgba(34, 211, 238, 0.15);
+    font-weight: 600;
+}
+
+/* Main Content */
+.app-main { flex: 1; max-width: 1400px; width: 100%; margin: 0 auto; padding: var(--spacing-xl); }
+
+/* Ensure analysis page allows vertical scrolling */
+.analysis-page .app-main { overflow-y: auto; }
 
 /* Analysis Controls Section */
 .analysis-controls-section {
@@ -122,6 +154,7 @@ body {
 
 .controls-card {
     background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
     box-shadow: var(--shadow-md);
@@ -151,7 +184,7 @@ body {
     padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    background: var(--bg-primary);
+    background: var(--bg-tertiary);
     color: var(--text-primary);
     font-size: 0.95rem;
     cursor: pointer;
@@ -160,12 +193,13 @@ body {
 
 .file-select:hover {
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.1);
 }
 
 .file-select:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
 }
 
 .control-actions {
@@ -186,6 +220,7 @@ body {
     gap: var(--spacing-sm);
     transition: all 0.2s;
     white-space: nowrap;
+    user-select: none;
 }
 
 .btn:disabled {
@@ -195,31 +230,37 @@ body {
 
 .btn-primary {
     background: var(--primary-color);
-    color: white;
+    color: #0d1117;
+    font-weight: 700;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: #1d4ed8;
+    background: var(--primary-hover);
     transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
 }
 
 .btn-secondary {
-    background: var(--secondary-color);
-    color: white;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: #334155;
+    background: var(--secondary-color);
+    color: #0d1117;
+    border-color: var(--secondary-color);
 }
 
 .btn-warning {
     background: var(--warning-color);
-    color: white;
+    color: #0d1117;
+    font-weight: 700;
 }
 
 .btn-warning:hover:not(:disabled) {
     background: #d97706;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
 
 .btn-pagination {
@@ -234,6 +275,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-xs);
+    user-select: none;
 }
 
 .btn-pagination:hover:not(:disabled) {
@@ -245,6 +287,34 @@ body {
 .btn-pagination:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}
+
+.btn-action {
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--primary-color);
+    color: #0d1117;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    user-select: none;
+}
+
+.btn-action:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+}
+
+.btn-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
 }
 
 /* Loading Overlay */
@@ -299,6 +369,8 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 2px solid var(--border-color);
 }
 
 .summary-grid {
@@ -310,6 +382,7 @@ body {
 
 .summary-card {
     background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
     box-shadow: var(--shadow-md);
@@ -322,6 +395,7 @@ body {
 .summary-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
+    border-color: rgba(34, 211, 238, 0.3);
 }
 
 .card-icon {
@@ -358,6 +432,7 @@ body {
     text-align: center;
     padding: var(--spacing-md);
     background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     color: var(--text-secondary);
     font-size: 0.875rem;
@@ -377,6 +452,7 @@ body {
 
 .data-table-card {
     background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
     overflow: hidden;
@@ -384,6 +460,7 @@ body {
 
 .data-table-card.threat-card {
     border: 2px solid var(--warning-color);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
 }
 
 .table-header {
@@ -405,8 +482,9 @@ body {
 }
 
 .badge {
-    background: var(--primary-color);
-    color: white;
+    background: rgba(34, 211, 238, 0.2);
+    color: var(--primary-color);
+    border: 1px solid rgba(34, 211, 238, 0.3);
     padding: 0.25rem 0.75rem;
     border-radius: 99px;
     font-size: 0.875rem;
@@ -445,14 +523,25 @@ body {
     padding: var(--spacing-md);
     border-bottom: 1px solid var(--border-color);
     color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+/* Style for IP addresses, MAC addresses, and technical data */
+.data-table td:first-child,
+.data-table td:nth-child(3) {
+    font-family: 'Courier New', Courier, monospace;
+    color: var(--primary-color);
+    font-weight: 500;
 }
 
 .data-table tbody tr {
-    transition: background 0.2s;
+    transition: all 0.2s;
+    cursor: default;
 }
 
 .data-table tbody tr:hover {
     background: var(--bg-secondary);
+    box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.2);
 }
 
 .data-table tbody tr:last-child td {
@@ -473,25 +562,37 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    user-select: none;
 }
 
 .page-info {
     color: var(--text-secondary);
     font-size: 0.875rem;
     font-weight: 500;
+    user-select: none;
+}
+
+/* Make cells with native title tooltips show a help cursor */
+.data-table td [title] {
+    cursor: help;
+    text-decoration: underline dotted transparent;
+}
+.data-table td [title]:hover {
+    text-decoration-color: currentColor;
 }
 
 /* Empty State */
 .empty-state {
     text-align: center;
     padding: var(--spacing-xl);
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 .empty-state i {
     font-size: 3rem;
     margin-bottom: var(--spacing-md);
-    opacity: 0.5;
+    opacity: 0.4;
+    color: var(--text-muted);
 }
 
 .empty-state p {
@@ -510,23 +611,33 @@ body {
 }
 
 .verdict-malicious {
-    background: #fee2e2;
-    color: #991b1b;
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .verdict-suspicious {
-    background: #fef3c7;
-    color: #92400e;
+    background: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .verdict-benign {
-    background: #d1fae5;
-    color: #065f46;
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.verdict-safe {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .verdict-unknown {
-    background: #e5e7eb;
-    color: #374151;
+    background: rgba(107, 114, 128, 0.2);
+    color: #9ca3af;
+    border: 1px solid rgba(107, 114, 128, 0.3);
 }
 
 /* Toast Notifications */
@@ -674,17 +785,18 @@ body {
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
     background: var(--border-color);
-    border-radius: 4px;
+    border-radius: 5px;
+    border: 2px solid var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb:hover {

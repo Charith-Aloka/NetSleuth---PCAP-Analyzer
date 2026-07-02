@@ -1,295 +1,350 @@
+"""
+Analyzer service: parses PCAP from DB and stores analysis results in SQLite.
+
+Uses existing tables: ip_observations, devices, domains, flows, analysis_runs.
+No schema changes.
+"""
+
 from __future__ import annotations
 
-"""
-Scapy-based PCAP analyzer that extracts:
-- Unique IPs and counts
-- Domains accessed per IP (DNS, HTTP Host, TLS SNI where possible)
-- Device hints (MAC, hostname) with first/last seen
-- Flows with packet/byte counts and time window
-
-Results are persisted into SQLite with idempotent inserts (UNIQUE constraints + upserts).
-"""
-
-import io
+import json
 import os
+import sys
 import tempfile
-import sqlite3
-from collections import defaultdict, namedtuple
-from typing import Dict, Tuple, Optional
+from collections import defaultdict, Counter
+from datetime import datetime
+from typing import Dict, Tuple, Any
 
-from scapy.all import PcapReader
-try:
-	from scapy.all import PcapNgReader  # type: ignore
-except Exception:  # pragma: no cover
-	PcapNgReader = None
+from scapy.all import PcapReader, ARP, Ether, IP, TCP, UDP, ICMP, DNS, DNSQR, DNSRR  # type: ignore
 
-from scapy.layers.l2 import Ether
-from scapy.layers.inet import IP, TCP, UDP
-from scapy.layers.inet6 import IPv6
-from scapy.layers.dns import DNS
-try:
-	from scapy.layers.dhcp import DHCP  # type: ignore
-except Exception:
-	DHCP = None
+from utils.db import get_db_connection
 
-# Optional layers (HTTP/TLS) may not always be decodable by Scapy without extra modules
-try:
-	from scapy.layers.http import HTTPRequest  # type: ignore
-except Exception:
-	HTTPRequest = None
-try:
-	from scapy.layers.tls.all import TLSClientHello, ServerNameIndication  # type: ignore
-except Exception:
-	TLSClientHello = None
-	ServerNameIndication = None
-
-FlowKey = namedtuple("FlowKey", "src sport dst dport proto")
+# Fix for Windows colorama issue - use simple print to stderr
+def log(msg):
+    """Safe logging that works on Windows"""
+    try:
+        sys.stderr.write(f"{msg}\n")
+        sys.stderr.flush()
+    except:
+        pass
 
 
-def _choose_reader_from_bytes(data: bytes):
-	# Heuristic: if file starts with pcapng magic number 0x0A0D0D0A
-	if len(data) >= 4 and data[:4] == b"\x0a\x0d\x0d\x0a" and PcapNgReader is not None:
-		return PcapNgReader
-	return PcapReader
+def _get_pcap_blob(pcap_id: int) -> bytes:
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        row = cur.execute('SELECT file_data FROM pcaps WHERE id = ?', (pcap_id,)).fetchone()
+        if not row:
+            raise ValueError('PCAP not found')
+        return row[0]
 
 
-def analyze_bytes_and_store(db: sqlite3.Connection, pcap_id: int, file_bytes: bytes) -> Dict:
-	"""Parse the given pcap bytes, update SQLite tables, and return a small summary dict."""
-	Reader = _choose_reader_from_bytes(file_bytes)
+def analyze_pcap(pcap_id: int) -> Dict[str, Any]:
+    """Analyze the PCAP for the given ID and store results in the DB.
 
-	ip_counts: Dict[str, int] = defaultdict(int)
-	devices: Dict[str, Dict] = {}
-	domains: Dict[Tuple[Optional[str], str, str], int] = defaultdict(int)  # (ip, domain, source) -> count
-	flows_pkts: Dict[FlowKey, int] = defaultdict(int)
-	flows_bytes: Dict[FlowKey, int] = defaultdict(int)
-	first_seen: Dict[str, float] = {}
-	last_seen: Dict[str, float] = {}
-	flow_first: Dict[FlowKey, float] = {}
-	flow_last: Dict[FlowKey, float] = {}
+    Returns a compact summary dict suitable for response payloads.
+    """
+    file_bytes = _get_pcap_blob(pcap_id)
+    
+    # Use sys.stderr instead of print to avoid colorama issues on Windows
+    import sys
+    sys.stderr.write(f"[ANALYZER] Starting analysis for PCAP ID {pcap_id}\n")
+    sys.stderr.write(f"[ANALYZER] File size: {len(file_bytes)} bytes ({len(file_bytes) / (1024*1024):.2f} MB)\n")
+    sys.stderr.flush()
 
-	# For best compatibility across Scapy versions, write to a temp file
-	tmp_path = None
-	try:
-		with tempfile.NamedTemporaryFile(delete=False, suffix='.pcapng' if Reader is PcapNgReader else '.pcap') as tf:
-			tf.write(file_bytes)
-			tmp_path = tf.name
-		with Reader(tmp_path) as rd:
-			for pkt in rd:
-				try:
-					ts = float(getattr(pkt, 'time', 0.0))
+    # Write to a temporary file for Scapy (keep original extension for pcapng support)
+    # Detect file type by magic bytes
+    file_ext = '.pcap'
+    if file_bytes[:4] == b'\x0a\x0d\x0d\x0a':  # pcapng magic bytes
+        file_ext = '.pcapng'
+        log("[ANALYZER] Detected PCAPNG format")
+    elif file_bytes[:4] == b'\xd4\xc3\xb2\xa1' or file_bytes[:4] == b'\xa1\xb2\xc3\xd4':  # pcap magic bytes
+        file_ext = '.pcap'
+        log("[ANALYZER] Detected PCAP format")
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+    
+    log(f"[ANALYZER] Temporary file created: {tmp_path}")
 
-					src_ip = dst_ip = None
-					if IP in pkt:
-						src_ip = pkt[IP].src
-						dst_ip = pkt[IP].dst
-					elif IPv6 in pkt:
-						src_ip = pkt[IPv6].src
-						dst_ip = pkt[IPv6].dst
+    total_packets = 0
+    total_bytes = 0
+    start_ts = None
+    end_ts = None
 
-					# Update IP counters and device times
-					for ip in (src_ip, dst_ip):
-						if ip:
-							ip_counts[ip] += 1
-							first_seen.setdefault(ip, ts)
-							last_seen[ip] = ts
+    protocol_counts = Counter()
+    size_min = None
+    size_max = None
+    size_sum = 0
 
-					# MAC addresses if available
-					if Ether in pkt and src_ip:
-						mac = getattr(pkt[Ether], 'src', None)
-						if mac:
-							dev = devices.setdefault(src_ip, {
-								'ip': src_ip,
-								'mac': None,
-								'hostname': None,
-								'first': ts,
-								'last': ts,
-							})
-							dev['mac'] = dev['mac'] or mac
-							dev['first'] = min(dev['first'], ts)
-							dev['last'] = max(dev['last'], ts)
+    ip_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
+        'packets': 0,
+        'bytes': 0,
+        'srcPackets': 0,
+        'dstPackets': 0,
+        'bytesUp': 0,
+        'bytesDown': 0,
+        'first': None,
+        'last': None,
+    })
 
-					# DNS queries (qr=0) -> domains by src_ip
-					if DNS in pkt and getattr(pkt[DNS], 'qd', None) is not None and getattr(pkt[DNS], 'qr', 0) == 0:
-						try:
-							qname = pkt[DNS].qd.qname
-							if isinstance(qname, bytes):
-								qname = qname.decode(errors='ignore')
-							qname = qname.strip('.')
-							if qname:
-								key = (src_ip, qname, 'DNS')
-								domains[key] += 1
-								# Heuristic hostname from mDNS (.local)
-								if qname.endswith('.local') and src_ip:
-									dev = devices.setdefault(src_ip, {
-										'ip': src_ip,
-										'mac': None,
-										'hostname': None,
-										'first': ts,
-										'last': ts,
-									})
-									dn = qname.split('.')[0]
-									if dn:
-										dev['hostname'] = dev.get('hostname') or dn
-						except Exception:
-							pass
+    # Map ip -> mac (best-effort)
+    ip_mac: Dict[str, str] = {}
 
-					# HTTP Host header (if HTTPRequest layer available)
-					if HTTPRequest is not None and HTTPRequest in pkt:
-						try:
-							host = getattr(pkt[HTTPRequest], 'Host', b'')
-							if isinstance(host, bytes):
-								host = host.decode(errors='ignore')
-							host = host.strip()
-							if host:
-								key = (src_ip, host, 'HTTP')
-								domains[key] += 1
-						except Exception:
-							pass
+    # Domain observations: key (domain, source, ip_or_none) -> count
+    domain_counts: Dict[Tuple[str, str, str | None], int] = defaultdict(int)
 
-					# TLS SNI if available (best-effort)
-					if TLSClientHello is not None and (TCP in pkt):
-						try:
-							# Scapy TLS parsing is heavy; best-effort pattern
-							# Extract raw TCP payload and try to parse for SNI extension
-							raw = bytes(pkt[TCP].payload) if pkt[TCP].payload else b''
-							if raw:
-								# Minimal heuristic: look for "\x00\x00" length then "\x00\x00"? Complex; fallback: skip unless TLS layer present
-								# For reliability, skip custom parsing if TLS layers are not dissected
-								pass
-						except Exception:
-							pass
+    # Flow aggregates: key (src, sport, dst, dport, proto) -> stats
+    flow_stats: Dict[Tuple[str, int, str, int, str], Dict[str, Any]] = {}
 
-					# DHCP hostnames
-					if DHCP is not None and DHCP in pkt and src_ip:
-						try:
-							opts = getattr(pkt[DHCP], 'options', [])
-							for k, v in opts:
-								if k == 'hostname' and v:
-									if isinstance(v, bytes):
-										v = v.decode(errors='ignore')
-									dev = devices.setdefault(src_ip, {
-										'ip': src_ip,
-										'mac': None,
-										'hostname': None,
-										'first': ts,
-										'last': ts,
-									})
-									if v:
-										dev['hostname'] = dev.get('hostname') or v
-									break
-						except Exception:
-							pass
+    packet_errors = 0
+    try:
+        log("[ANALYZER] Opening PCAP file for reading...")
+        with PcapReader(tmp_path) as pcap:
+            log("[ANALYZER] Starting packet iteration...")
+            for pkt in pcap:
+                # Log progress every 10000 packets
+                if total_packets > 0 and total_packets % 10000 == 0:
+                    log(f"[ANALYZER] Processed {total_packets} packets...")
+                try:
+                    ts = float(getattr(pkt, 'time', datetime.utcnow().timestamp()))
+                    raw_len = len(bytes(pkt)) if pkt is not None else 0
+                except Exception as e:
+                    packet_errors += 1
+                    if packet_errors <= 5:  # Only log first 5 errors
+                        log(f"[ANALYZER] Warning: Packet parsing error: {e}")
+                    ts = datetime.utcnow().timestamp()
+                    raw_len = 0
 
-					# Flows
-					proto = None
-					sport = dport = None
-					if TCP in pkt:
-						proto = 'TCP'
-						sport = int(getattr(pkt[TCP], 'sport', 0) or 0)
-						dport = int(getattr(pkt[TCP], 'dport', 0) or 0)
-					elif UDP in pkt:
-						proto = 'UDP'
-						sport = int(getattr(pkt[UDP], 'sport', 0) or 0)
-						dport = int(getattr(pkt[UDP], 'dport', 0) or 0)
+                total_packets += 1
+                total_bytes += raw_len
+                start_ts = ts if start_ts is None else min(start_ts, ts)
+                end_ts = ts if end_ts is None else max(end_ts, ts)
 
-					if src_ip and dst_ip and proto:
-						key = FlowKey(src_ip, sport, dst_ip, dport, proto)
-						flows_pkts[key] += 1
-						# Prefer wirelen if present else len
-						try:
-							pkt_len = int(getattr(pkt, 'wirelen', None) or len(bytes(pkt)))
-						except Exception:
-							pkt_len = 0
-						flows_bytes[key] += pkt_len
-						flow_first.setdefault(key, ts)
-						flow_last[key] = ts
+                # Packet size stats
+                size_min = raw_len if size_min is None else min(size_min, raw_len)
+                size_max = raw_len if size_max is None else max(size_max, raw_len)
+                size_sum += raw_len
 
-				except Exception:
-					pass
+                # Protocols and layers
+                proto = 'OTHER'
+                if pkt.haslayer(ARP):
+                    proto = 'ARP'
+                elif pkt.haslayer(IP):
+                    if pkt.haslayer(TCP):
+                        proto = 'TCP'
+                    elif pkt.haslayer(UDP):
+                        proto = 'UDP'
+                    elif pkt.haslayer(ICMP):
+                        proto = 'ICMP'
+                    else:
+                        proto = 'IP'
+                protocol_counts[proto] += 1
 
-	finally:
-		if tmp_path and os.path.exists(tmp_path):
-			try:
-				os.unlink(tmp_path)
-			except Exception:
-				pass
+                # IP-level tracking and flows
+                if pkt.haslayer(IP):
+                    ip = pkt[IP]
+                    src = ip.src
+                    dst = ip.dst
 
-	# Persist into SQLite with UPSERT semantics
-	cur = db.cursor()
+                    # Mac association best-effort
+                    if pkt.haslayer(Ether):
+                        eth = pkt[Ether]
+                        if src not in ip_mac and eth.src:
+                            ip_mac[src] = eth.src
+                        if dst not in ip_mac and eth.dst:
+                            ip_mac[dst] = eth.dst
 
-	# Mark/insert analysis_runs row (one per pcap_id)
-	from datetime import datetime, timezone
-	analyzed_at = datetime.now(timezone.utc).isoformat()
-	cur.execute(
-		"""
-		INSERT INTO analysis_runs (pcap_id, analyzed_at)
-		VALUES (?, ?)
-		ON CONFLICT(pcap_id) DO UPDATE SET analyzed_at=excluded.analyzed_at
-		""",
-		(pcap_id, analyzed_at),
-	)
+                    # IP stats (count both directions)
+                    for who, direction in ((src, 'src'), (dst, 'dst')):
+                        st = ip_stats[who]
+                        st['packets'] += 1
+                        st['bytes'] += raw_len
+                        if direction == 'src':
+                            st['srcPackets'] += 1
+                            st['bytesUp'] += raw_len
+                        else:
+                            st['dstPackets'] += 1
+                            st['bytesDown'] += raw_len
+                        st['first'] = ts if st['first'] is None else min(st['first'], ts)
+                        st['last'] = ts if st['last'] is None else max(st['last'], ts)
 
-	# IP observations
-	for ip, cnt in ip_counts.items():
-		cur.execute(
-			"""
-			INSERT INTO ip_observations (pcap_id, ip, count)
-			VALUES (?, ?, ?)
-			ON CONFLICT(pcap_id, ip) DO UPDATE SET count = count + excluded.count
-			""",
-			(pcap_id, ip, cnt),
-		)
+                    # Ports and flows
+                    sport = 0
+                    dport = 0
+                    fproto = 'IP'
+                    if pkt.haslayer(TCP):
+                        tcp = pkt[TCP]
+                        sport = int(tcp.sport)
+                        dport = int(tcp.dport)
+                        fproto = 'TCP'
+                    elif pkt.haslayer(UDP):
+                        udp = pkt[UDP]
+                        sport = int(udp.sport)
+                        dport = int(udp.dport)
+                        fproto = 'UDP'
+                    elif pkt.haslayer(ICMP):
+                        fproto = 'ICMP'
 
-	# Devices
-	for ip, d in devices.items():
-		cur.execute(
-			"""
-			INSERT INTO devices (pcap_id, ip, mac, hostname, first_seen, last_seen)
-			VALUES (?, ?, ?, ?, ?, ?)
-			ON CONFLICT(pcap_id, ip) DO UPDATE SET
-				mac = COALESCE(excluded.mac, mac),
-				hostname = COALESCE(excluded.hostname, hostname),
-				first_seen = MIN(COALESCE(first_seen, excluded.first_seen), excluded.first_seen),
-				last_seen = MAX(COALESCE(last_seen, excluded.last_seen), excluded.last_seen)
-			""",
-			(pcap_id, ip, d.get('mac'), d.get('hostname'), d.get('first'), d.get('last')),
-		)
+                    key = (src, sport, dst, dport, fproto)
+                    fs = flow_stats.get(key)
+                    if fs is None:
+                        fs = {
+                            'packets': 0,
+                            'bytes': 0,
+                            'first': ts,
+                            'last': ts,
+                        }
+                        flow_stats[key] = fs
+                    fs['packets'] += 1
+                    fs['bytes'] += raw_len
+                    fs['first'] = min(fs['first'], ts)
+                    fs['last'] = max(fs['last'], ts)
 
-	# Domains
-	for (ip, domain, source), cnt in domains.items():
-		cur.execute(
-			"""
-			INSERT INTO domains (pcap_id, ip, domain, source, count)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(pcap_id, ip, domain, source) DO UPDATE SET count = count + excluded.count
-			""",
-			(pcap_id, ip, domain, source, cnt),
-		)
+                # Domains via DNS (queries + answers)
+                if pkt.haslayer(DNS):
+                    dns = pkt[DNS]
+                    # Get source IP (who made the DNS request)
+                    src_ip = None
+                    if pkt.haslayer(IP):
+                        src_ip = pkt[IP].src
+                    
+                    # Queries
+                    if dns.qr == 0 and dns.qd is not None and isinstance(dns.qd, DNSQR):
+                        qname = dns.qd.qname.decode(errors='ignore').rstrip('.')
+                        if qname:
+                            domain_counts[(qname, 'DNS', src_ip)] += 1
+                    # Answers: associate domain with source IP (who accessed it)
+                    if dns.an is not None:
+                        an = dns.an
+                        # May be a RR or a list; iterate robustly
+                        answers = []
+                        try:
+                            i = 0
+                            while True:
+                                rr = an[i]
+                                answers.append(rr)
+                                i += 1
+                        except Exception:
+                            if isinstance(an, DNSRR):
+                                answers.append(an)
+                        for rr in answers:
+                            try:
+                                name = rr.rrname.decode(errors='ignore').rstrip('.')
+                                if name:
+                                    # Store source IP (who accessed) instead of resolved IP
+                                    domain_counts[(name, 'DNS', src_ip)] += 1
+                            except Exception:
+                                continue
+    
+    except Exception as e:
+        log(f"[ANALYZER] ERROR during packet reading: {e}")
+        log(f"[ANALYZER] Processed {total_packets} packets before error")
+        # Continue with what we have
+    
+    finally:
+        log("[ANALYZER] Cleaning up temporary file...")
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+    
+    log("[ANALYZER] Packet processing complete:")
+    print(f"  - Total packets: {total_packets}")
+    print(f"  - Total bytes: {total_bytes}")
+    print(f"  - Packet errors: {packet_errors}")
+    print(f"  - Unique IPs: {len(ip_stats)}")
+    print(f"  - Flows: {len(flow_stats)}")
+    print(f"  - Domains: {len(domain_counts)}")
 
-	# Flows
-	for key, pkts in flows_pkts.items():
-		bytes_total = int(flows_bytes.get(key, 0))
-		cur.execute(
-			"""
-			INSERT INTO flows (pcap_id, src_ip, src_port, dst_ip, dst_port, protocol, packet_count, byte_count, first_seen, last_seen)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(pcap_id, src_ip, src_port, dst_ip, dst_port, protocol) DO UPDATE SET
-				packet_count = packet_count + excluded.packet_count,
-				byte_count = byte_count + excluded.byte_count,
-				first_seen = MIN(COALESCE(first_seen, excluded.first_seen), excluded.first_seen),
-				last_seen = MAX(COALESCE(last_seen, excluded.last_seen), excluded.last_seen)
-			""",
-			(pcap_id, key.src, key.sport, key.dst, key.dport, key.proto, pkts, bytes_total, flow_first.get(key), flow_last.get(key)),
-		)
+    avg_size = (size_sum / total_packets) if total_packets else 0.0
+    duration_sec = (end_ts - start_ts) if (start_ts is not None and end_ts is not None) else 0.0
 
-	db.commit()
+    log("[ANALYZER] Starting database writes...")
+    
+    # Prepare DB writes
+    with get_db_connection() as conn:
+        cur = conn.cursor()
 
-	return {
-		'pcap_id': pcap_id,
-		'ips': len(ip_counts),
-		'devices': len(devices),
-		'domains': len({(d[0], d[1]) for d in domains.keys()}),
-		'flows': len(flows_pkts),
-		'analyzed_at': analyzed_at,
-	}
+        # Clear previous analysis artifacts to keep idempotent
+        log("[ANALYZER] Clearing previous analysis data...")
+        cur.execute('DELETE FROM ip_observations WHERE pcap_id = ?', (pcap_id,))
+        cur.execute('DELETE FROM devices WHERE pcap_id = ?', (pcap_id,))
+        cur.execute('DELETE FROM domains WHERE pcap_id = ?', (pcap_id,))
+        cur.execute('DELETE FROM flows WHERE pcap_id = ?', (pcap_id,))
 
+        # ip_observations
+        log(f"[ANALYZER] Inserting {len(ip_stats)} IP observations...")
+        for ip, st in ip_stats.items():
+            cur.execute(
+                'INSERT INTO ip_observations (pcap_id, ip, count) VALUES (?, ?, ?)',
+                (pcap_id, ip, int(st['packets']))
+            )
+
+        # devices (best-effort from MAC mapping and seen times)
+        log(f"[ANALYZER] Inserting {len(ip_stats)} devices...")
+        for ip, st in ip_stats.items():
+            mac = ip_mac.get(ip)
+            hostname = None  # could be filled from DNS PTR in future
+            first_seen = float(st['first']) if st['first'] is not None else None
+            last_seen = float(st['last']) if st['last'] is not None else None
+            cur.execute(
+                'INSERT INTO devices (pcap_id, ip, mac, hostname, first_seen, last_seen) VALUES (?, ?, ?, ?, ?, ?)',
+                (pcap_id, ip, mac, hostname, first_seen, last_seen)
+            )
+
+        # domains
+        log(f"[ANALYZER] Inserting {len(domain_counts)} domain observations...")
+        for (domain, source, ip_str), count in domain_counts.items():
+            cur.execute(
+                'INSERT INTO domains (pcap_id, ip, domain, source, count) VALUES (?, ?, ?, ?, ?) '
+                'ON CONFLICT(pcap_id, ip, domain, source) DO UPDATE SET count=excluded.count',
+                (pcap_id, ip_str, domain, source, int(count))
+            )
+
+        # flows
+        log(f"[ANALYZER] Inserting {len(flow_stats)} flows...")
+        for (src, sport, dst, dport, proto), st in flow_stats.items():
+            cur.execute(
+                'INSERT INTO flows (pcap_id, src_ip, src_port, dst_ip, dst_port, protocol, packet_count, byte_count, first_seen, last_seen) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '
+                'ON CONFLICT(pcap_id, src_ip, src_port, dst_ip, dst_port, protocol) DO UPDATE SET '
+                'packet_count=excluded.packet_count, byte_count=excluded.byte_count, first_seen=excluded.first_seen, last_seen=excluded.last_seen',
+                (pcap_id, src, sport, dst, dport, proto, int(st['packets']), int(st['bytes']), float(st['first']), float(st['last']))
+            )
+
+        analyzed_at = datetime.utcnow().isoformat()
+        notes = {
+            'captureSummary': {
+                'totalPackets': total_packets,
+                'totalBytes': total_bytes,
+                'startTs': start_ts,
+                'endTs': end_ts,
+                'durationSec': duration_sec,
+                'protocols': dict(protocol_counts),
+                'packetSizes': {
+                    'min': size_min or 0,
+                    'max': size_max or 0,
+                    'avg': round(avg_size, 2)
+                }
+            }
+        }
+
+        log("[ANALYZER] Inserting analysis run metadata...")
+        cur.execute(
+            'INSERT INTO analysis_runs (pcap_id, analyzed_at, duration_ms, notes) VALUES (?, ?, ?, ?) '
+            'ON CONFLICT(pcap_id) DO UPDATE SET analyzed_at=excluded.analyzed_at, duration_ms=excluded.duration_ms, notes=excluded.notes',
+            (pcap_id, analyzed_at, int(duration_sec * 1000), json.dumps(notes))
+        )
+
+        log("[ANALYZER] Committing to database...")
+        conn.commit()
+
+    log("[ANALYZER] Analysis complete! Summary:")
+    print(f"  - Packets: {total_packets}")
+    print(f"  - IPs: {len(ip_stats)}")
+    print(f"  - Flows: {len(flow_stats)}")
+    print(f"  - Domains: {len(domain_counts)}")
+    print(f"  - Duration: {duration_sec:.2f}s")
+    
+    return notes

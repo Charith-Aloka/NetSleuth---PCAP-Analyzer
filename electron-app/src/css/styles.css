@@ -30,6 +30,133 @@
     --border-radius-lg: 12px;
 }
 
+/* Files page theme overrides - Black/Dark theme */
+.files-page {
+    /* Dark surface palette */
+    --bg-primary: #0d1117;        /* primary surface */
+    --bg-secondary: #0b0f14;      /* header/alt surface */
+    --bg-tertiary: #141a22;       /* input/table rows */
+    --border-color: #1f2937;      /* subtle borders */
+
+    /* Typography */
+    --text-primary: #e5e7eb;      /* slate-200 */
+    --text-secondary: #9ca3af;    /* slate-400 */
+    --text-muted: #6b7280;        /* slate-500 */
+
+    /* Accents */
+    --primary-color: #22d3ee;     /* cyan-400 */
+    --primary-hover: #06b6d4;     /* cyan-500 */
+    --secondary-color: #60a5fa;   /* blue-400 */
+}
+
+/* Header and title accents on dark */
+.files-page .app-header {
+    background: var(--bg-secondary);
+    border-bottom-color: #111827;
+}
+
+.files-page .app-title i {
+    color: var(--primary-color);
+}
+
+/* Nav links on dark */
+.files-page .nav-link {
+    color: var(--text-secondary);
+    border-color: transparent;
+}
+.files-page .nav-link:hover {
+    background: #0f172a;
+    border-color: #111827;
+    color: var(--text-primary);
+}
+.files-page .nav-link.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #0b0f14;
+}
+
+/* Content area */
+.files-page .app-main {
+    background: var(--bg-primary);
+}
+
+/* Cards */
+.files-page .file-card {
+    background: #0f172a;
+    border-color: #111827;
+}
+.files-page .file-card:hover {
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.files-page .file-card .file-icon {
+    background: #0b1220;
+}
+
+/* Upload area */
+.files-page .upload-area {
+    background: #0f172a;
+    border-color: #111827;
+}
+.files-page .upload-area:hover,
+.files-page .upload-area.drag-over {
+    border-color: var(--primary-color);
+    background: rgba(34, 211, 238, 0.06);
+}
+.files-page .upload-content i { color: var(--text-muted); }
+.files-page .upload-btn { color: var(--primary-color); }
+.files-page .upload-btn:hover { color: var(--primary-hover); }
+
+/* Inputs, selects, search */
+.files-page .search-box input,
+.files-page select {
+    background: #0b1220;
+    border-color: #111827;
+    color: var(--text-primary);
+}
+.files-page .search-box input:focus,
+.files-page select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+}
+
+/* Buttons */
+.files-page .btn {
+    background: #0b1220;
+    border-color: #111827;
+    color: var(--text-primary);
+}
+.files-page .btn:hover {
+    background: #0b0f14;
+    border-color: #1f2937;
+}
+.files-page .btn-primary {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #0b0f14;
+}
+.files-page .btn-primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+.files-page .btn-danger {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #0b0f14;
+}
+.files-page .btn-danger:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+}
+
+/* Progress bar */
+.files-page .upload-progress { background: #0f172a; border-color: #111827; }
+.files-page .progress-bar { background: #0b1220; }
+.files-page .progress-fill { background: var(--primary-color); }
+
+/* Empty state */
+.files-page .empty-state { color: var(--text-secondary); }
+.files-page .empty-state h3 { color: var(--text-primary); }
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-secondary);
@@ -74,6 +201,42 @@ body {
     font-size: 1.5rem;
     font-weight: 600;
     color: var(--text-primary);
+}
+
+/* Top Navigation */
+.top-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all 0.18s ease-in-out;
+}
+
+.nav-link:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+.nav-link.active {
+    color: #ffffff;
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 1px 2px rgba(37,99,235,0.25);
+}
+
+.nav-link i {
+    font-size: 0.95rem;
 }
 
 .header-stats {
@@ -696,11 +859,67 @@ select:focus {
     font-size: 3rem;
     color: var(--primary-color);
     margin-bottom: 1rem;
+    animation: spin 1s linear infinite;
 }
 
 .loading-spinner p {
     font-size: 1.1rem;
     font-weight: 500;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Spin animation for loading spinner */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Pulse animation for loading text */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Analyze button pulse animation */
+button[data-action="analyze"] {
+    position: relative;
+    overflow: hidden;
+}
+
+button[data-action="analyze"]::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+button[data-action="analyze"]:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+button[data-action="analyze"]:active {
+    transform: scale(0.95);
+}
+
+/* Pulsing glow effect for Analyze button */
+@keyframes analyzeGlow {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(37, 99, 235, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(37, 99, 235, 0.8), 0 0 30px rgba(37, 99, 235, 0.4);
+    }
+}
+
+button[data-action="analyze"]:not(:disabled):not(:active) {
+    animation: analyzeGlow 2s ease-in-out infinite;
 }
 
 /* Modal */
