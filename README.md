@@ -248,6 +248,3 @@ Packet captures are among the most sensitive artefacts in security work - they c
 
 MIT - see `electron-app/package.json`.
 
-## 👤 Author
-
-Built by [Charith-Aloka](https://github.com/Charith-Aloka) as a cyber-security course project.
