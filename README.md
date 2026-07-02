@@ -1,4 +1,4 @@
-# 🕵️ NetSleuth — PCAP Analyzer
+# 🕵️ NetSleuth - PCAP Analyzer
 
 > A desktop network-forensics tool that ingests packet captures (`.pcap` / `.pcapng`) and turns raw traffic into readable intelligence: hosts, devices, domains, flows, and AI-assisted threat verdicts.
 
