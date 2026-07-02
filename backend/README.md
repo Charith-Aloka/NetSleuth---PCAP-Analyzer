@@ -8,6 +8,6 @@ Setup:
 - Run backend: python app.py
 
 API endpoints:
-- POST /api/analysis/<pcap_id>/assess_domains — triggers classification and stores results
-- GET /api/analysis/<pcap_id>/assessments — fetch stored results
+- POST /api/analysis/<pcap_id>/assess_domains - triggers classification and stores results
+- GET /api/analysis/<pcap_id>/assessments - fetch stored results
 
